@@ -121,7 +121,7 @@
       </div>
 
       <!-- Filters & Search Toolbar -->
-      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm mb-6 flex flex-col md:flex-row gap-4 items-center justify-between">
+      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm mb-4 flex flex-col md:flex-row gap-4 items-center justify-between">
         <div class="flex flex-wrap gap-2 w-full md:w-auto">
           <button onclick="setFilterStatus('todas')" class="filter-btn px-3 py-1.5 rounded-lg text-xs font-bold transition bg-slate-900 text-white" data-status="todas">Todas</button>
           <button onclick="setFilterStatus('nova')" class="filter-btn px-3 py-1.5 rounded-lg text-xs font-bold transition bg-slate-100 text-slate-600 hover:bg-slate-200" data-status="nova">Novas</button>
@@ -130,14 +130,18 @@
           <button onclick="setFilterStatus('descartada')" class="filter-btn px-3 py-1.5 rounded-lg text-xs font-bold transition bg-slate-100 text-slate-600 hover:bg-slate-200" data-status="descartada">Descartadas</button>
         </div>
 
-        <div class="flex items-center gap-3 w-full md:w-auto">
-          <div class="relative w-full md:w-64">
+        <div class="flex flex-wrap items-center gap-3 w-full md:w-auto">
+          <button id="btnEvalAllPending" onclick="evaluateAllPendingJobs()" class="hidden px-3.5 py-1.5 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white rounded-lg text-xs font-bold shadow-sm transition flex items-center gap-1.5">
+            <i class="fa-solid fa-wand-magic-sparkles"></i>
+            <span id="btnEvalAllPendingText">Avaliar Pendentes com IA</span>
+          </button>
+          <div class="relative w-full md:w-60">
             <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-xs"></i>
             <input type="text" id="searchInput" oninput="debounceSearch()" placeholder="Filtrar por cargo, empresa..." class="w-full pl-8 pr-3 py-1.5 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500">
           </div>
           <select id="scoreFilter" onchange="loadJobs()" class="py-1.5 px-3 border border-slate-200 rounded-lg text-xs font-medium text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
             <option value="">Qualquer Score</option>
-            <option value="80">Score &ge; 80%</option>
+            <option value="80">Score &ge; 80% (Alto Match)</option>
             <option value="70">Score &ge; 70%</option>
             <option value="50">Score &ge; 50%</option>
           </select>
@@ -217,8 +221,8 @@
 
             <div class="md:col-span-2">
               <label class="block text-xs font-bold text-slate-700 mb-1">Cargos Desejados (separados por vírgula)</label>
-              <input type="text" id="profTargetRoles" class="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500" placeholder="Ex: Product Designer, UX Designer, Desenvolvedor Frontend">
-              <p class="text-[11px] text-slate-400 mt-1">O robô busca automaticamente por sinônimos e termos em inglês correspondentes.</p>
+              <input type="text" id="profTargetRoles" class="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500" placeholder="Ex: Analista de RH, Recrutador, Tech Recruiter, Assistente de Gente">
+              <p class="text-[11px] text-slate-400 mt-1">O robô busca exclusivamente as vagas que correspondem a estes cargos e termos.</p>
             </div>
 
             <div>
@@ -230,6 +234,15 @@
               <label class="block text-xs font-bold text-slate-700 mb-1">Pretensão Salarial Mínima (R$ / mês)</label>
               <input type="number" id="profMinSalary" step="500" class="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500" placeholder="0 = Sem filtro de salário mínimo">
             </div>
+          </div>
+
+          <!-- Fontes e Filtros Avançados -->
+          <div class="pt-2 border-t border-slate-100">
+            <label class="flex items-center gap-2 cursor-pointer font-medium text-xs text-slate-700">
+              <input type="checkbox" id="includeInternational" class="rounded text-indigo-600">
+              <span>Incluir fontes internacionais de trabalho remoto em inglês (Remotive / RemoteOK)</span>
+            </label>
+            <p class="text-[11px] text-slate-400 ml-5">Deixe desmarcado se você procura vagas no Brasil (Stone, QuintoAndar, iFood, Wellhub, Nubank, PicPay, etc.).</p>
           </div>
 
           <!-- Modalidades e Contrato -->
@@ -378,19 +391,60 @@
       { id: 13, name: 'PicPay', country_code: 'BR', greenhouse_board_token: 'picpay', lever_site: null, website: 'https://picpay.com' }
     ];
 
-    const SYNONYMS_MAP = {
-      "desenvolvedor": ["developer", "software engineer", "frontend", "backend", "fullstack", "programador", "engenheiro"],
-      "dev": ["developer", "software engineer", "frontend", "backend", "fullstack"],
-      "designer": ["product designer", "ux designer", "ui designer", "ui/ux", "web designer", "ux", "design"],
-      "dados": ["data analyst", "data engineer", "data scientist", "analista de dados", "analytics"],
-      "produto": ["product manager", "product owner", "gerente de produto", "pm", "po"],
-      "marketing": ["growth", "social media", "content", "copywriter", "marketing digital"],
-      "vendas": ["sales", "sdr", "bdr", "account executive", "comercial"],
-      "financeiro": ["analista financeiro", "financial analyst", "finanças", "controladoria"]
-    };
-
     let currentFilterStatus = 'todas';
     let searchDebounceTimeout = null;
+
+    // Normalização de texto sem acentos e minúsculo
+    function normalizeText(text) {
+      return (text || '')
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "");
+    }
+
+    // Correspondência 100% Dinâmica baseada nos Cargos e Negativas do Perfil
+    function matchesJobTitle(title, targetRoles, negativeKeywords, isRemote, workModes) {
+      const normTitle = normalizeText(title);
+
+      // 1. Filtro estrito de palavras-chave negativas definidas no perfil
+      if (negativeKeywords && negativeKeywords.length > 0) {
+        for (const neg of negativeKeywords) {
+          const cleanNeg = normalizeText(neg).trim();
+          if (!cleanNeg) continue;
+          if (normTitle.includes(cleanNeg)) {
+            return false;
+          }
+        }
+      }
+
+      // 2. Filtro de modalidade (se usuário marcou apenas Remoto)
+      if (workModes && workModes.includes('remote') && workModes.length === 1) {
+        if (normTitle.includes('100% presencial') || normTitle.includes('presencial obrigatorio') || normTitle.includes('on-site')) {
+          return false;
+        }
+      }
+
+      // 3. Se não há cargos definidos ainda, deixa passar para avaliação da IA
+      if (!targetRoles || targetRoles.length === 0) return true;
+
+      // 4. Match dinâmico com os cargos desejados do usuário
+      for (const role of targetRoles) {
+        const cleanRole = normalizeText(role).trim();
+        if (!cleanRole) continue;
+
+        if (cleanRole.includes(' ')) {
+          // Termo composto (ex: "analista fiscal", "product designer", "tech recruiter")
+          if (normTitle.includes(cleanRole)) return true;
+        } else {
+          // Palavra única com boundary regex (evita "po" dar match em "oportunidade", "dev" em "development")
+          const escaped = cleanRole.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const regex = new RegExp(`(^|[^a-z0-9])${escaped}([^a-z0-9]|$)`, 'i');
+          if (regex.test(normTitle)) return true;
+        }
+      }
+
+      return false;
+    }
 
     // Utilitários de Storage
     function getStoredProfile() {
@@ -402,11 +456,12 @@
         name: '',
         email: '',
         resume_text: '',
-        target_roles: ['Designer', 'Product Designer'],
+        target_roles: [],
         negative_keywords: [],
         min_salary: 0,
         work_modes: ['remote'],
         employment_types: ['CLT', 'PJ'],
+        include_international: false,
         ai_provider: 'gemini',
         ai_api_key: '',
         ai_model: 'gemini-3-flash-preview'
@@ -496,6 +551,9 @@
       document.getElementById('typeCLT').checked = types.includes('CLT');
       document.getElementById('typePJ').checked = types.includes('PJ');
 
+      const incInt = document.getElementById('includeInternational');
+      if (incInt) incInt.checked = !!p.include_international;
+
       document.getElementById('profAIProvider').value = p.ai_provider || 'gemini';
       updateAIModelOptions();
       document.getElementById('profAIModel').value = p.ai_model || 'gemini-3-flash-preview';
@@ -519,6 +577,8 @@
       if (document.getElementById('typeCLT').checked) empTypes.push('CLT');
       if (document.getElementById('typePJ').checked) empTypes.push('PJ');
 
+      const incInt = document.getElementById('includeInternational');
+
       const profile = {
         name: document.getElementById('profName').value || 'Meu Perfil',
         email: document.getElementById('profEmail').value || '',
@@ -528,6 +588,7 @@
         min_salary: parseFloat(document.getElementById('profMinSalary').value) || 0,
         work_modes: workModes,
         employment_types: empTypes,
+        include_international: incInt ? incInt.checked : false,
         ai_provider: document.getElementById('profAIProvider').value,
         ai_api_key: document.getElementById('profAIApiKey').value.trim(),
         ai_model: document.getElementById('profAIModel').value
@@ -674,7 +735,7 @@
       }
     }
 
-    // Autocompletar Perfil com IA
+    // Autocompletar Perfil com IA com base no Currículo
     async function autocompleteProfileAI() {
       const resumeText = document.getElementById('profResumeText').value;
       const apiKey = document.getElementById('profAIApiKey').value.trim();
@@ -682,14 +743,26 @@
       const model = document.getElementById('profAIModel').value;
 
       if (!resumeText) return alert('Cole o texto do currículo antes de autocompletar.');
-      if (!apiKey) return alert('Preencha sua chave de IA para permitir a análise.');
+      if (!apiKey) return alert('Preencha sua chave de IA para permitir a análise do currículo.');
 
-      showToast('Analisando currículo com IA...', 'info');
-      const prompt = `Analise este currículo e extraia o nome e 3 a 5 cargos ideais.
-CURRÍCULO:
-"""${resumeText.slice(0, 4000)}"""
+      showToast('Analisando currículo com IA para sugerir cargos compatíveis...', 'info');
+      const prompt = `Você é um recrutador e headhunter sênior no Brasil.
+Analise detalhadamente o currículo a seguir e identifique o perfil exato do profissional.
+
+CURRÍCULO DO CANDIDATO:
+"""${resumeText.slice(0, 4500)}"""
+
+Com base EXCLUSIVAMENTE nas experiências, habilidades, ferramentas e histórico real descritos neste currículo:
+1. Extraia o nome completo do candidato.
+2. Identifique de 3 a 5 títulos de cargos compatíveis mais usuais no mercado brasileiro para este perfil (ex: se for RH, sugira cargos de RH; se for Finanças, sugira cargos de Finanças; se for Designer, sugira Design; etc.).
+3. Sugira palavras-chave negativas (outras áreas ou níveis incompatíveis que devem ser evitados para não trazer vagas erradas).
+
 Responda EXCLUSIVAMENTE em formato JSON:
-{"name": "Nome", "suggested_roles": ["Cargo 1", "Cargo 2"]}`;
+{
+  "name": "Nome do Candidato",
+  "suggested_roles": ["Cargo 1", "Cargo 2", "Cargo 3"],
+  "suggested_negative_keywords": ["Termo 1", "Termo 2"]
+}`;
 
       try {
         const res = await callAI(prompt, apiKey, provider, model);
@@ -699,7 +772,10 @@ Responda EXCLUSIVAMENTE em formato JSON:
         if (res.suggested_roles && res.suggested_roles.length > 0) {
           document.getElementById('profTargetRoles').value = res.suggested_roles.join(', ');
         }
-        showToast('Perfil preenchido pela IA com sucesso!', 'success');
+        if (res.suggested_negative_keywords && res.suggested_negative_keywords.length > 0 && !document.getElementById('profNegativeKeywords').value) {
+          document.getElementById('profNegativeKeywords').value = res.suggested_negative_keywords.join(', ');
+        }
+        showToast('Perfil preenchido pela IA com base no currículo!', 'success');
       } catch (err) {
         showToast('Erro na análise da IA: ' + err.message, 'error');
       }
@@ -713,28 +789,14 @@ Responda EXCLUSIVAMENTE em formato JSON:
       return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
     }
 
-    // Expansão de Sinônimos
-    function expandSearchTerms(terms) {
-      const expanded = new Set();
-      terms.forEach(t => {
-        const clean = t.trim().toLowerCase();
-        if (!clean) return;
-        expanded.add(clean);
-        for (const [key, syns] of Object.entries(SYNONYMS_MAP)) {
-          if (clean.includes(key)) {
-            syns.forEach(s => expanded.add(s));
-          }
-        }
-      });
-      return Array.from(expanded);
-    }
-
     // COLETA DE VAGAS DIRETAMENTE DO NAVEGADOR
-    async function fetchAllJobs(terms, companies) {
+    async function fetchAllJobs(profile, companies) {
       const collected = [];
-      const normalizedTerms = terms.map(t => t.toLowerCase());
+      const targetRoles = profile.target_roles || [];
+      const negKeywords = profile.negative_keywords || [];
+      const workModes = profile.work_modes || ['remote'];
 
-      // 1. Greenhouse Boards
+      // 1. Greenhouse Boards das empresas cadastradas
       for (const comp of companies) {
         if (!comp.greenhouse_board_token) continue;
         try {
@@ -744,11 +806,11 @@ Responda EXCLUSIVAMENTE em formato JSON:
           const jobs = data.jobs || [];
 
           for (const j of jobs) {
-            const titleLower = (j.title || '').toLowerCase();
-            if (!normalizedTerms.some(term => titleLower.includes(term))) continue;
-
             const loc = j.location?.name || 'Brasil';
             const isRemote = loc.toLowerCase().includes('remote') || loc.toLowerCase().includes('remoto');
+
+            if (!matchesJobTitle(j.title, targetRoles, negKeywords, isRemote, workModes)) continue;
+
             const cleanDesc = (j.content || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
             const hash = await generateHash(`${comp.name}|${j.title}|${cleanDesc.slice(0, 1000)}`);
 
@@ -770,7 +832,7 @@ Responda EXCLUSIVAMENTE em formato JSON:
         } catch (e) {}
       }
 
-      // 2. Lever Postings
+      // 2. Lever Postings das empresas cadastradas
       for (const comp of companies) {
         if (!comp.lever_site) continue;
         try {
@@ -779,11 +841,11 @@ Responda EXCLUSIVAMENTE em formato JSON:
           const postings = await res.json();
 
           for (const p of postings) {
-            const titleLower = (p.text || '').toLowerCase();
-            if (!normalizedTerms.some(term => titleLower.includes(term))) continue;
-
             const loc = p.categories?.location || 'Brasil';
             const isRemote = (p.categories?.workplaceType || '').toLowerCase().includes('remote') || loc.toLowerCase().includes('remoto');
+
+            if (!matchesJobTitle(p.text, targetRoles, negKeywords, isRemote, workModes)) continue;
+
             const cleanDesc = (p.descriptionPlain || p.description || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
             const hash = await generateHash(`${comp.name}|${p.text}|${cleanDesc.slice(0, 1000)}`);
 
@@ -805,115 +867,120 @@ Responda EXCLUSIVAMENTE em formato JSON:
         } catch (e) {}
       }
 
-      // 3. Remotive API
-      try {
-        const res = await fetch('https://remotive.com/api/remote-jobs?limit=50');
-        if (res.ok) {
-          const data = await res.json();
-          for (const r of data.jobs || []) {
-            const titleLower = (r.title || '').toLowerCase();
-            if (!normalizedTerms.some(term => titleLower.includes(term))) continue;
+      // 3. Fontes Internacionais (Apenas se o usuário marcou no perfil)
+      if (profile.include_international) {
+        // Remotive API
+        try {
+          const res = await fetch('https://remotive.com/api/remote-jobs?limit=50');
+          if (res.ok) {
+            const data = await res.json();
+            for (const r of data.jobs || []) {
+              if (!matchesJobTitle(r.title, targetRoles, negKeywords, true, workModes)) continue;
 
-            const cleanDesc = (r.description || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-            const hash = await generateHash(`${r.company_name}|${r.title}|${cleanDesc.slice(0, 1000)}`);
+              const cleanDesc = (r.description || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+              const hash = await generateHash(`${r.company_name}|${r.title}|${cleanDesc.slice(0, 1000)}`);
 
-            collected.push({
-              source: 'remotive',
-              external_id: String(r.id),
-              company_name: r.company_name,
-              title: r.title,
-              location: r.candidate_required_location || 'Remote (Worldwide)',
-              remote_type: 'remote',
-              description: cleanDesc,
-              application_url: r.url,
-              salary_min: null,
-              salary_max: null,
-              content_hash: hash,
-              published_at: r.publication_date
-            });
+              collected.push({
+                source: 'remotive',
+                external_id: String(r.id),
+                company_name: r.company_name,
+                title: r.title,
+                location: r.candidate_required_location || 'Remote (Worldwide)',
+                remote_type: 'remote',
+                description: cleanDesc,
+                application_url: r.url,
+                salary_min: null,
+                salary_max: null,
+                content_hash: hash,
+                published_at: r.publication_date
+              });
+            }
           }
-        }
-      } catch (e) {}
+        } catch (e) {}
 
-      // 4. RemoteOK API
-      try {
-        const res = await fetch('https://remoteok.com/api');
-        if (res.ok) {
-          const raw = await res.json();
-          const postings = Array.isArray(raw) ? raw.filter(p => p && p.id) : [];
-          for (const p of postings) {
-            const tags = Array.isArray(p.tags) ? p.tags.join(' ') : '';
-            const combined = `${p.position || ''} ${tags}`.toLowerCase();
-            if (!normalizedTerms.some(term => combined.includes(term))) continue;
+        // RemoteOK API
+        try {
+          const res = await fetch('https://remoteok.com/api');
+          if (res.ok) {
+            const raw = await res.json();
+            const postings = Array.isArray(raw) ? raw.filter(p => p && p.id) : [];
+            for (const p of postings) {
+              const tags = Array.isArray(p.tags) ? p.tags.join(' ') : '';
+              const combined = `${p.position || ''} ${tags}`;
+              if (!matchesJobTitle(combined, targetRoles, negKeywords, true, workModes)) continue;
 
-            const cleanDesc = (p.description || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-            const hash = await generateHash(`${p.company}|${p.position}|${cleanDesc.slice(0, 1000)}`);
+              const cleanDesc = (p.description || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+              const hash = await generateHash(`${p.company}|${p.position}|${cleanDesc.slice(0, 1000)}`);
 
-            collected.push({
-              source: 'remoteok',
-              external_id: String(p.id),
-              company_name: p.company || 'Empresa Confidencial',
-              title: p.position,
-              location: p.location || 'Remote',
-              remote_type: 'remote',
-              description: cleanDesc,
-              application_url: p.url,
-              salary_min: p.salary_min || null,
-              salary_max: p.salary_max || null,
-              content_hash: hash,
-              published_at: p.date
-            });
+              collected.push({
+                source: 'remoteok',
+                external_id: String(p.id),
+                company_name: p.company || 'Empresa Confidencial',
+                title: p.position,
+                location: p.location || 'Remote',
+                remote_type: 'remote',
+                description: cleanDesc,
+                application_url: p.url,
+                salary_min: p.salary_min || null,
+                salary_max: p.salary_max || null,
+                content_hash: hash,
+                published_at: p.date
+              });
+            }
           }
-        }
-      } catch (e) {}
+        } catch (e) {}
+      }
 
       return collected;
     }
 
-    // AVALIAÇÃO DE UMA VAGA COM IA
+    // AVALIAÇÃO MINUCIOSA DE UMA VAGA COM IA CONFRONTANDO COM O CURRÍCULO
     async function evaluateJobWithAI(job, profile) {
       if (!profile.ai_api_key) {
         return {
           score: 50,
           seniority: 'Aguardando',
           qualified: true,
-          positives: ['Vaga capturada por título compatível'],
-          concerns: ['Configure sua chave de IA nas opções para ter a análise profunda'],
-          reasoning: 'Vaga identificada por compatibilidade de título. Aguardando análise da IA.',
+          positives: ['Vaga capturada por cargo compatível com seu perfil'],
+          concerns: ['Configure sua chave de IA no perfil para ter a análise profunda'],
+          reasoning: 'Vaga identificada pelo título. Insira sua chave de IA para calcular o Match real com seu currículo.',
           evaluated_at: new Date().toISOString()
         };
       }
 
-      const prompt = `Você é um recrutador sênior. Avalie minuciosamente a compatibilidade entre a VAGA e o CANDIDATO.
+      const prompt = `Você é um recrutador sênior técnico e headhunter experiente.
+Avalie com rigor e honestidade a compatibilidade entre o CURRÍCULO DO CANDIDATO e a VAGA a seguir.
 
-PERFIL DO CANDIDATO:
-- Nome: ${profile.name}
+CURRÍCULO REAL DO CANDIDATO:
+"""${(profile.resume_text || 'Não informado').slice(0, 3800)}"""
+
+PREFERÊNCIAS DO CANDIDATO:
 - Cargos Alvos: ${(profile.target_roles || []).join(', ')}
-- Termos a Evitar: ${(profile.negative_keywords || []).join(', ')}
-- Modalidades: ${(profile.work_modes || []).join(', ')}
-- Pretensão Salarial Mínima: R$ ${profile.min_salary || 0}
-- Currículo:
-"""${profile.resume_text.slice(0, 3000)}"""
+- Modalidades Aceitas: ${(profile.work_modes || []).join(', ')}
 
-VAGA A SER AVALIADA:
-- Título: ${job.title}
+DADOS DA VAGA AVALIADA:
+- Cargo/Título: ${job.title}
 - Empresa: ${job.company_name}
 - Localização: ${job.location}
-- Modalidade: ${job.remote_type || 'Presencial/Híbrido'}
-- Descrição:
-"""${job.description.slice(0, 3000)}"""
+- Modalidade: ${job.remote_type || 'Presencial / Híbrido'}
+- Descrição Completa:
+"""${(job.description || '').slice(0, 3800)}"""
 
-REGRAS:
-1. PONTUAÇÃO (0 a 100): Avalie technical_score (peso 25%), experience_score (peso 25%), seniority_score (peso 20%), remote_score (15%), salary_score (15%). Score final ponderado de 0 a 100.
-2. Sênioridade estimada (ex: Júnior, Pleno, Sênior, Staff).
-3. 2 a 3 pontos fortes (positives) e 1 a 2 pontos de alerta (concerns).
-4. reasoning: 2 a 3 frases explicativas.
-5. qualified: true se score >= 65.
+DIRETRIZES DE AVALIAÇÃO:
+1. MATCH COM O CURRÍCULO: Compare linha por linha as competências, formação, ferramentas e histórico profissional citados no currículo com os requisitos da vaga.
+2. SE A VAGA NÃO FOR DA ÁREA DO CURRÍCULO (ex: o candidato é de outra área e a vaga é de TI/Dev, ou vice-versa), atribua score proporcionalmente baixo (< 40) e aponte com clareza no parecer.
+3. Se a vaga tiver alta sinergia com o currículo, pontue de acordo (70 a 95).
+4. Score Final: 0 a 100.
+5. Sênioridade estimada (ex: Estágio, Júnior, Pleno, Sênior, Especialista/Lead).
+6. Positivos (2 a 3 pontos fortes reais do candidato para esta vaga).
+7. Concerns (1 a 2 gaps ou requisitos da vaga ausentes no currículo).
+8. Reasoning (parecer humano de 2 a 3 frases explicando por que a vaga tem ou não a ver com o currículo).
+9. qualified: true se score >= 65, senão false.
 
 Responda EXCLUSIVAMENTE em formato JSON:
 {
   "score": 85,
-  "seniority": "Sênior",
+  "seniority": "Pleno",
   "qualified": true,
   "positives": ["...", "..."],
   "concerns": ["..."],
@@ -927,40 +994,87 @@ Responda EXCLUSIVAMENTE em formato JSON:
 
     // EXECUTAR BUSCA COMPLETA
     async function triggerSearch() {
-      const modal = document.getElementById('searchModal');
-      modal.classList.remove('hidden');
-
       const profile = getStoredProfile();
+
+      if ((!profile.target_roles || profile.target_roles.length === 0) && !profile.resume_text) {
+        alert('Por favor, defina seus Cargos Desejados ou envie seu Currículo na aba "Meu Agente" antes de buscar vagas.');
+        switchTab('profile');
+        return;
+      }
+
+      // Se não definiu cargos mas tem currículo e chave de IA, extrai automaticamente antes de buscar
+      if ((!profile.target_roles || profile.target_roles.length === 0) && profile.resume_text && profile.ai_api_key) {
+        showToast('Identificando cargos compatíveis com seu currículo via IA...', 'info');
+        try {
+          const autoPrompt = `Analise este currículo e extraia de 3 a 5 cargos ideais de busca no Brasil:\n"""${profile.resume_text.slice(0, 3000)}"""\nResponda em JSON: {"roles": ["Cargo 1", "Cargo 2"]}`;
+          const resRoles = await callAI(autoPrompt, profile.ai_api_key, profile.ai_provider, profile.ai_model);
+          if (resRoles.roles && resRoles.roles.length > 0) {
+            profile.target_roles = resRoles.roles;
+            saveStoredProfile(profile);
+            loadProfile();
+          }
+        } catch (e) {}
+      }
+
+      const modal = document.getElementById('searchModal');
+      const progressText = document.getElementById('searchProgressText');
+      modal.classList.remove('hidden');
+      progressText.innerText = `Consultando murais de vagas compatíveis com ${(profile.target_roles || []).join(', ')}...`;
+
       const companies = getStoredCompanies();
       const existingJobs = getStoredJobs();
       const existingEvals = getStoredEvaluations();
 
-      const expandedTerms = expandSearchTerms(profile.target_roles || ['Designer']);
-
       try {
-        const newlyFetched = await fetchAllJobs(expandedTerms, companies);
-        
+        const newlyFetched = await fetchAllJobs(profile, companies);
+
         let newCount = 0;
         const jobMap = new Map();
         existingJobs.forEach(j => jobMap.set(j.content_hash, j));
 
+        const newlyAdded = [];
         for (const j of newlyFetched) {
           if (!jobMap.has(j.content_hash)) {
             jobMap.set(j.content_hash, j);
+            newlyAdded.push(j);
             newCount++;
-            // Se ainda não tem avaliação, define a inicial
-            if (!existingEvals[j.content_hash]) {
+          }
+        }
+
+        // Se tem currículo e chave de IA, avalia automaticamente as top vagas capturadas com o currículo!
+        if (profile.ai_api_key && profile.resume_text && newlyAdded.length > 0) {
+          const toEvaluate = newlyAdded.slice(0, 8); // avalia até 8 vagas por busca na hora
+          for (let i = 0; i < toEvaluate.length; i++) {
+            const j = toEvaluate[i];
+            progressText.innerText = `Avaliando afinidade com seu currículo via IA (${i + 1} de ${toEvaluate.length})...`;
+            try {
+              const ev = await evaluateJobWithAI(j, profile);
+              ev.status = 'nova';
+              existingEvals[j.content_hash] = ev;
+            } catch (evalErr) {
               existingEvals[j.content_hash] = {
                 score: 50,
-                seniority: 'Aguardando',
-                qualified: true,
-                positives: ['Palavras-chave correspondem ao cargo desejado'],
-                concerns: ['Aguardando análise da IA'],
-                reasoning: 'Vaga capturada por título compatível. Clique para analisar com IA.',
                 status: 'nova',
-                evaluated_at: new Date().toISOString()
+                seniority: 'Aguardando',
+                reasoning: 'Não foi possível avaliar via IA: ' + evalErr.message
               };
             }
+          }
+        }
+
+        // Para quaisquer outras vagas que não foram avaliadas no lote inicial:
+        for (const j of newlyAdded) {
+          if (!existingEvals[j.content_hash]) {
+            existingEvals[j.content_hash] = {
+              score: 50,
+              seniority: 'Aguardando',
+              qualified: true,
+              positives: ['Vaga capturada por cargo compatível'],
+              concerns: ['Clique para analisar com IA'],
+              reasoning: 'Vaga identificada pelo título. Clique em "Avaliar com IA" para gerar o parecer completo.',
+              status: 'nova',
+              evaluated_at: new Date().toISOString()
+            };
           }
         }
 
@@ -1019,6 +1133,7 @@ Responda EXCLUSIVAMENTE em formato JSON:
 
         showToast(`Vaga avaliada com IA! Match: ${evaluation.score}%`, 'success');
         loadStats();
+        loadJobs();
       } catch (err) {
         showToast('Erro na avaliação: ' + err.message, 'error');
         if (btn) {
@@ -1026,6 +1141,57 @@ Responda EXCLUSIVAMENTE em formato JSON:
           btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles text-indigo-500 mr-1"></i> Avaliar com IA Agora';
         }
       }
+    }
+
+    // AVALIAR TODAS AS VAGAS PENDENTES COM IA EM LOTE
+    async function evaluateAllPendingJobs() {
+      const profile = getStoredProfile();
+      if (!profile.ai_api_key || !profile.resume_text) {
+        alert('Para avaliar vagas em lote, configure sua chave de IA e cole seu currículo na aba "Meu Agente".');
+        switchTab('profile');
+        return;
+      }
+
+      const jobs = getStoredJobs();
+      const evals = getStoredEvaluations();
+
+      const pending = jobs.filter(j => {
+        const e = evals[j.content_hash];
+        return !e || !e.score || e.score === 50 || (e.reasoning && (e.reasoning.includes('Aguardando') || e.reasoning.includes('Clique')));
+      });
+
+      if (pending.length === 0) {
+        showToast('Todas as vagas já foram avaliadas pela IA!', 'info');
+        return;
+      }
+
+      const btn = document.getElementById('btnEvalAllPending');
+      const btnText = document.getElementById('btnEvalAllPendingText');
+      if (btn) btn.disabled = true;
+
+      showToast(`Avaliando ${pending.length} vagas com IA...`, 'info');
+
+      for (let i = 0; i < pending.length; i++) {
+        const j = pending[i];
+        if (btnText) btnText.innerText = `Avaliando ${i + 1}/${pending.length}...`;
+        try {
+          const ev = await evaluateJobWithAI(j, profile);
+          ev.status = evals[j.content_hash]?.status || 'nova';
+          evals[j.content_hash] = ev;
+          saveStoredEvaluations(evals);
+          loadStats();
+          loadJobs();
+        } catch (err) {
+          console.error('Erro ao avaliar vaga:', err);
+        }
+      }
+
+      if (btn) {
+        btn.disabled = false;
+        btnText.innerText = 'Avaliar Pendentes com IA';
+      }
+      showToast('Avaliação em lote concluída com sucesso!', 'success');
+      loadJobs();
     }
 
     // Ações de Vaga
@@ -1156,6 +1322,24 @@ Responda EXCLUSIVAMENTE em formato JSON:
 
       const jobs = getStoredJobs();
       const evals = getStoredEvaluations();
+      const profile = getStoredProfile();
+
+      // Atualiza botão de avaliação em lote se houver vagas pendentes
+      const pendingJobs = jobs.filter(j => {
+        const e = evals[j.content_hash];
+        return !e || !e.score || e.score === 50 || (e.reasoning && (e.reasoning.includes('Aguardando') || e.reasoning.includes('Clique')));
+      });
+
+      const btnEval = document.getElementById('btnEvalAllPending');
+      const btnEvalText = document.getElementById('btnEvalAllPendingText');
+      if (btnEval && btnEvalText) {
+        if (pendingJobs.length > 0 && profile.ai_api_key && profile.resume_text) {
+          btnEval.classList.remove('hidden');
+          btnEvalText.innerText = `Avaliar Pendentes com IA (${pendingJobs.length})`;
+        } else {
+          btnEval.classList.add('hidden');
+        }
+      }
 
       const filtered = jobs.filter(j => {
         const e = evals[j.content_hash] || { score: 50, status: 'nova' };
@@ -1175,7 +1359,7 @@ Responda EXCLUSIVAMENTE em formato JSON:
         return true;
       });
 
-      // Ordenação: primeiro as vagas já avaliadas por score decrescente, depois as pendentes
+      // Ordenação: primeiro as vagas já avaliadas com maior score decrescente, depois as pendentes
       filtered.sort((a, b) => {
         const ea = evals[a.content_hash] || { score: 50, reasoning: 'Aguardando' };
         const eb = evals[b.content_hash] || { score: 50, reasoning: 'Aguardando' };
