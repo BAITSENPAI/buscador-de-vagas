@@ -1,0 +1,1359 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Buscador de Vagas com IA | Agente Autônomo 100% Privado</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- FontAwesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Google Fonts Inter -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- PDF.js para extração de currículo PDF 100% no navegador -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script>
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  </script>
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #f1f5f9; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
+
+  <!-- Header -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center text-white shadow-md shadow-indigo-100">
+          <i class="fa-solid fa-robot text-lg"></i>
+        </div>
+        <div>
+          <h1 class="font-bold text-lg text-slate-900 leading-tight">Buscador de Vagas IA</h1>
+          <p class="text-xs text-slate-500 font-medium" id="headerSubtitle">100% Privado no Navegador</p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2 sm:gap-3">
+        <button id="btnNavFeed" onclick="switchTab('feed')" class="px-3.5 py-2 rounded-lg text-sm font-semibold transition bg-indigo-50 text-indigo-700">
+          <i class="fa-solid fa-compass mr-1.5"></i> Vagas
+        </button>
+        <button id="btnNavProfile" onclick="switchTab('profile')" class="px-3.5 py-2 rounded-lg text-sm font-semibold transition text-slate-600 hover:bg-slate-100">
+          <i class="fa-solid fa-sliders mr-1.5"></i> Meu Agente
+        </button>
+        <button id="btnNavCompanies" onclick="switchTab('companies')" class="px-3.5 py-2 rounded-lg text-sm font-semibold transition text-slate-600 hover:bg-slate-100">
+          <i class="fa-solid fa-building mr-1.5"></i> Empresas
+        </button>
+
+        <button onclick="triggerSearch()" id="btnTriggerSearch" class="ml-2 px-4 py-2 rounded-lg text-sm font-bold bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md hover:from-indigo-700 hover:to-violet-700 transition flex items-center gap-2">
+          <i class="fa-solid fa-wand-magic-sparkles"></i>
+          <span class="hidden sm:inline">Buscar Vagas Agora</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Notification Toast Container -->
+  <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+  <!-- Loading Overlay Modal for Job Search -->
+  <div id="searchModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center hidden">
+    <div class="bg-white rounded-2xl p-6 sm:p-8 max-w-md w-full mx-4 shadow-2xl text-center">
+      <div class="w-16 h-16 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mx-auto mb-4"></div>
+      <h3 class="text-xl font-bold text-slate-900 mb-2">Buscando e Avaliando Vagas...</h3>
+      <p class="text-sm text-slate-500 mb-4" id="searchProgressText">Consultando fontes de vagas diretamente pelo seu navegador...</p>
+      <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+        <div class="bg-indigo-600 h-full animate-pulse w-full"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Content Area -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+    <!-- TAB 1: FEED DE VAGAS -->
+    <div id="tabFeed">
+      <!-- Stats Summary -->
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4">
+          <div class="w-12 h-12 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center text-xl font-bold">
+            <i class="fa-solid fa-briefcase"></i>
+          </div>
+          <div>
+            <p class="text-xs font-semibold text-slate-500 uppercase">Total Coletadas</p>
+            <h3 class="text-2xl font-bold text-slate-900" id="statTotalJobs">0</h3>
+          </div>
+        </div>
+
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4">
+          <div class="w-12 h-12 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center text-xl font-bold">
+            <i class="fa-solid fa-star"></i>
+          </div>
+          <div>
+            <p class="text-xs font-semibold text-slate-500 uppercase">Alta Aderência (&ge;70%)</p>
+            <h3 class="text-2xl font-bold text-emerald-600" id="statHighMatch">0</h3>
+          </div>
+        </div>
+
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4">
+          <div class="w-12 h-12 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center text-xl font-bold">
+            <i class="fa-solid fa-bookmark"></i>
+          </div>
+          <div>
+            <p class="text-xs font-semibold text-slate-500 uppercase">Favoritas</p>
+            <h3 class="text-2xl font-bold text-slate-900" id="statFavorites">0</h3>
+          </div>
+        </div>
+
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4">
+          <div class="w-12 h-12 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center text-xl font-bold">
+            <i class="fa-solid fa-paper-plane"></i>
+          </div>
+          <div>
+            <p class="text-xs font-semibold text-slate-500 uppercase">Candidatadas</p>
+            <h3 class="text-2xl font-bold text-slate-900" id="statApplied">0</h3>
+          </div>
+        </div>
+      </div>
+
+      <!-- Filters & Search Toolbar -->
+      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm mb-6 flex flex-col md:flex-row gap-4 items-center justify-between">
+        <div class="flex flex-wrap gap-2 w-full md:w-auto">
+          <button onclick="setFilterStatus('todas')" class="filter-btn px-3 py-1.5 rounded-lg text-xs font-bold transition bg-slate-900 text-white" data-status="todas">Todas</button>
+          <button onclick="setFilterStatus('nova')" class="filter-btn px-3 py-1.5 rounded-lg text-xs font-bold transition bg-slate-100 text-slate-600 hover:bg-slate-200" data-status="nova">Novas</button>
+          <button onclick="setFilterStatus('favorita')" class="filter-btn px-3 py-1.5 rounded-lg text-xs font-bold transition bg-slate-100 text-slate-600 hover:bg-slate-200" data-status="favorita">⭐ Favoritas</button>
+          <button onclick="setFilterStatus('candidatado')" class="filter-btn px-3 py-1.5 rounded-lg text-xs font-bold transition bg-slate-100 text-slate-600 hover:bg-slate-200" data-status="candidatado">💼 Me Canditatei</button>
+          <button onclick="setFilterStatus('descartada')" class="filter-btn px-3 py-1.5 rounded-lg text-xs font-bold transition bg-slate-100 text-slate-600 hover:bg-slate-200" data-status="descartada">Descartadas</button>
+        </div>
+
+        <div class="flex items-center gap-3 w-full md:w-auto">
+          <div class="relative w-full md:w-64">
+            <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-xs"></i>
+            <input type="text" id="searchInput" oninput="debounceSearch()" placeholder="Filtrar por cargo, empresa..." class="w-full pl-8 pr-3 py-1.5 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          </div>
+          <select id="scoreFilter" onchange="loadJobs()" class="py-1.5 px-3 border border-slate-200 rounded-lg text-xs font-medium text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            <option value="">Qualquer Score</option>
+            <option value="80">Score &ge; 80%</option>
+            <option value="70">Score &ge; 70%</option>
+            <option value="50">Score &ge; 50%</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Job Cards Feed List -->
+      <div id="jobsList" class="flex flex-col gap-4">
+        <!-- Vagas renderizadas via JS -->
+      </div>
+
+      <!-- Empty State -->
+      <div id="emptyState" class="hidden text-center py-16 bg-white rounded-2xl border border-dashed border-slate-200">
+        <div class="w-16 h-16 rounded-full bg-indigo-50 text-indigo-500 flex items-center justify-center text-2xl mx-auto mb-4">
+          <i class="fa-solid fa-folder-open"></i>
+        </div>
+        <h3 class="text-base font-bold text-slate-800 mb-1">Nenhuma vaga encontrada para esses filtros</h3>
+        <p class="text-xs text-slate-500 max-w-sm mx-auto mb-4">Clique no botão "Buscar Vagas Agora" no topo ou configure seus cargos na aba "Meu Agente".</p>
+        <button onclick="triggerSearch()" class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-xs font-bold shadow hover:bg-indigo-700">
+          <i class="fa-solid fa-wand-magic-sparkles mr-1.5"></i> Buscar Vagas Agora
+        </button>
+      </div>
+    </div>
+
+    <!-- TAB 2: MEU AGENTE / PERFIL -->
+    <div id="tabProfile" class="hidden max-w-4xl mx-auto">
+      <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 sm:p-8">
+        <div class="border-b border-slate-100 pb-5 mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h2 class="text-xl font-bold text-slate-900">Configuração do Agente</h2>
+            <p class="text-xs text-slate-500">Seus dados ficam gravados 100% no cache do seu navegador (Privacidade Total).</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <button onclick="exportUserData()" class="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50">
+              <i class="fa-solid fa-download mr-1"></i> Exportar Dados
+            </button>
+            <label class="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 cursor-pointer">
+              <i class="fa-solid fa-upload mr-1"></i> Importar Dados
+              <input type="file" accept=".json" onchange="importUserData(event)" class="hidden">
+            </label>
+            <button onclick="saveProfile()" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-md transition">
+              Salvar Alterações
+            </button>
+          </div>
+        </div>
+
+        <form onsubmit="event.preventDefault(); saveProfile();" class="space-y-6">
+          <!-- 1. Currículo -->
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider">1. Seu Currículo (Base de Análise da IA)</label>
+              <div class="flex items-center gap-2">
+                <label class="cursor-pointer text-xs font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-3 py-1 rounded-lg transition border border-indigo-100 flex items-center gap-1.5">
+                  <i class="fa-solid fa-file-pdf"></i>
+                  <span>Importar PDF</span>
+                  <input type="file" id="resumePdfInput" accept=".pdf,.txt" onchange="handleResumeUpload(event)" class="hidden">
+                </label>
+                <button type="button" onclick="autocompleteProfileAI()" class="text-xs font-bold text-violet-600 hover:text-violet-800 bg-violet-50 hover:bg-violet-100 px-3 py-1 rounded-lg transition border border-violet-100 flex items-center gap-1.5">
+                  <i class="fa-solid fa-wand-magic-sparkles"></i>
+                  <span>Autocompletar com IA</span>
+                </button>
+              </div>
+            </div>
+            <textarea id="profResumeText" rows="6" class="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs font-mono text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Cole o texto do seu currículo aqui ou envie um PDF acima..."></textarea>
+          </div>
+
+          <!-- 2. Preferências do Candidato -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1">Seu Nome</label>
+              <input type="text" id="profName" class="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500" placeholder="Ex: Douglas ou Maria">
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1">E-mail (Opcional)</label>
+              <input type="email" id="profEmail" class="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500" placeholder="seu.email@exemplo.com">
+            </div>
+
+            <div class="md:col-span-2">
+              <label class="block text-xs font-bold text-slate-700 mb-1">Cargos Desejados (separados por vírgula)</label>
+              <input type="text" id="profTargetRoles" class="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500" placeholder="Ex: Product Designer, UX Designer, Desenvolvedor Frontend">
+              <p class="text-[11px] text-slate-400 mt-1">O robô busca automaticamente por sinônimos e termos em inglês correspondentes.</p>
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1">Palavras-chave a Evitar (Negativas)</label>
+              <input type="text" id="profNegativeKeywords" class="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500" placeholder="Ex: Estágio, Java, Presencial, Vendas">
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-1">Pretensão Salarial Mínima (R$ / mês)</label>
+              <input type="number" id="profMinSalary" step="500" class="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500" placeholder="0 = Sem filtro de salário mínimo">
+            </div>
+          </div>
+
+          <!-- Modalidades e Contrato -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-slate-100">
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-2">Modalidades Aceitas</label>
+              <div class="flex gap-4 text-xs">
+                <label class="flex items-center gap-1.5 cursor-pointer font-medium"><input type="checkbox" id="modeRemote" checked class="rounded text-indigo-600"> Remoto</label>
+                <label class="flex items-center gap-1.5 cursor-pointer font-medium"><input type="checkbox" id="modeHybrid" class="rounded text-indigo-600"> Híbrido</label>
+                <label class="flex items-center gap-1.5 cursor-pointer font-medium"><input type="checkbox" id="modeOnsite" class="rounded text-indigo-600"> Presencial</label>
+              </div>
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-slate-700 mb-2">Regimes de Contrato</label>
+              <div class="flex gap-4 text-xs">
+                <label class="flex items-center gap-1.5 cursor-pointer font-medium"><input type="checkbox" id="typeCLT" checked class="rounded text-indigo-600"> CLT</label>
+                <label class="flex items-center gap-1.5 cursor-pointer font-medium"><input type="checkbox" id="typePJ" checked class="rounded text-indigo-600"> PJ</label>
+              </div>
+            </div>
+          </div>
+
+          <!-- 3. Motor de Inteligência Artificial -->
+          <div class="pt-4 border-t border-slate-100">
+            <h3 class="text-xs font-bold text-slate-700 uppercase tracking-wider mb-3">3. Motor de Inteligência Artificial</h3>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-3">
+              <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Provedor de IA</label>
+                <select id="profAIProvider" onchange="updateAIModelOptions()" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs bg-white focus:ring-2 focus:ring-indigo-500">
+                  <option value="gemini">Google Gemini (Grátis & Recomendado)</option>
+                  <option value="openai">OpenAI (ChatGPT)</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Modelo</label>
+                <select id="profAIModel" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs bg-white focus:ring-2 focus:ring-indigo-500">
+                  <option value="gemini-3-flash-preview">Gemini 3 Flash Preview (Recomendado)</option>
+                  <option value="gemini-3.1-flash-lite-preview">Gemini 3.1 Flash-Lite (Ultra Rápido)</option>
+                  <option value="gemini-flash-latest">Gemini Flash Latest</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <div class="flex items-center justify-between mb-1">
+                <label class="block text-xs font-semibold text-slate-600">Chave de API (API Key)</label>
+                <a href="https://aistudio.google.com/app/apikey" target="_blank" class="text-[11px] text-indigo-600 hover:underline">Como obter chave grátis do Gemini &rarr;</a>
+              </div>
+              <div class="flex gap-2">
+                <input type="password" id="profAIApiKey" class="flex-1 px-3.5 py-2 border border-slate-200 rounded-xl text-xs font-mono focus:ring-2 focus:ring-indigo-500" placeholder="Cole sua chave aqui (salva apenas no seu navegador)...">
+                <button type="button" onclick="testAIConnection()" class="px-4 py-2 border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold transition">Testar Conexão</button>
+              </div>
+              <div id="aiTestFeedback" class="text-xs mt-1.5 hidden font-semibold"></div>
+            </div>
+          </div>
+
+          <div class="pt-4 border-t border-slate-100 flex justify-end">
+            <button type="button" onclick="saveProfile()" class="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-md transition">
+              Salvar Alterações
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- TAB 3: EMPRESAS -->
+    <div id="tabCompanies" class="hidden max-w-5xl mx-auto">
+      <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 sm:p-8">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 mb-6 border-b border-slate-100">
+          <div>
+            <h2 class="text-xl font-bold text-slate-900">Empresas Catalogadas</h2>
+            <p class="text-xs text-slate-500">Buscamos vagas diretamente nos murais oficiais dessas empresas.</p>
+          </div>
+          <button onclick="openAddCompanyModal()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-md transition flex items-center gap-2">
+            <i class="fa-solid fa-plus"></i> Adicionar Empresa
+          </button>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs text-slate-600">
+            <thead class="bg-slate-50 text-slate-400 uppercase text-[10px] font-bold border-b border-slate-100">
+              <tr>
+                <th class="py-3 px-4">Empresa</th>
+                <th class="py-3 px-4">País</th>
+                <th class="py-3 px-4">Mural / ATS</th>
+                <th class="py-3 px-4">Link Oficial</th>
+                <th class="py-3 px-4 text-right">Ação</th>
+              </tr>
+            </thead>
+            <tbody id="companiesTableBody" class="divide-y divide-slate-100">
+              <!-- Renderizado via JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Modal Adicionar Empresa -->
+  <div id="addCompanyModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center hidden">
+    <div class="bg-white rounded-2xl p-6 sm:p-8 max-w-md w-full mx-4 shadow-2xl">
+      <h3 class="text-lg font-bold text-slate-900 mb-1">Adicionar Nova Empresa</h3>
+      <p class="text-xs text-slate-500 mb-4">Adicione o identificador do Greenhouse ou Lever da empresa.</p>
+
+      <form onsubmit="handleSaveCompany(event)" class="space-y-3 text-xs">
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Nome da Empresa</label>
+          <input type="text" id="newCompName" required class="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs" placeholder="Ex: Mercado Livre">
+        </div>
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Greenhouse Token (se houver)</label>
+          <input type="text" id="newCompGreenhouse" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs" placeholder="Ex: stone, brex, quintoandar">
+        </div>
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Lever Site ID (se houver)</label>
+          <input type="text" id="newCompLever" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs" placeholder="Ex: ifood">
+        </div>
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Website</label>
+          <input type="url" id="newCompWebsite" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs" placeholder="https://...">
+        </div>
+        <div class="pt-3 flex justify-end gap-2">
+          <button type="button" onclick="closeAddCompanyModal()" class="px-3 py-2 text-slate-600 font-bold hover:bg-slate-100 rounded-lg">Cancelar</button>
+          <button type="submit" class="px-4 py-2 bg-indigo-600 text-white font-bold rounded-lg shadow hover:bg-indigo-700">Salvar Empresa</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- SCRIPT PRINCIPAL 100% CLIENT-SIDE -->
+  <script>
+    // Catálogo Inicial de Empresas (salvo no localStorage)
+    const DEFAULT_COMPANIES = [
+      { id: 1, name: 'Stone', country_code: 'BR', greenhouse_board_token: 'stone', lever_site: null, website: 'https://stone.co' },
+      { id: 2, name: 'QuintoAndar', country_code: 'BR', greenhouse_board_token: 'quintoandar', lever_site: null, website: 'https://quintoandar.com.br' },
+      { id: 3, name: 'Wellhub (Gympass)', country_code: 'BR', greenhouse_board_token: 'gympass', lever_site: null, website: 'https://wellhub.com' },
+      { id: 4, name: 'VTEX', country_code: 'BR', greenhouse_board_token: 'vtex', lever_site: null, website: 'https://vtex.com' },
+      { id: 5, name: 'RD Station', country_code: 'BR', greenhouse_board_token: 'rdstation', lever_site: null, website: 'https://rdstation.com' },
+      { id: 6, name: 'Brex', country_code: 'US', greenhouse_board_token: 'brex', lever_site: null, website: 'https://brex.com' },
+      { id: 7, name: 'EBANX', country_code: 'BR', greenhouse_board_token: 'ebanx', lever_site: null, website: 'https://ebanx.com' },
+      { id: 8, name: 'Wildlife Studios', country_code: 'BR', greenhouse_board_token: 'wildlifestudios', lever_site: null, website: 'https://wildlifestudios.com' },
+      { id: 9, name: 'Nubank', country_code: 'BR', greenhouse_board_token: 'nubank', lever_site: null, website: 'https://nubank.com.br' },
+      { id: 10, name: 'iFood', country_code: 'BR', greenhouse_board_token: null, lever_site: 'ifood', website: 'https://ifood.com.br' },
+      { id: 11, name: 'Creditas', country_code: 'BR', greenhouse_board_token: 'creditas', lever_site: null, website: 'https://creditas.com' },
+      { id: 12, name: 'Loft', country_code: 'BR', greenhouse_board_token: 'loft', lever_site: null, website: 'https://loft.com.br' },
+      { id: 13, name: 'PicPay', country_code: 'BR', greenhouse_board_token: 'picpay', lever_site: null, website: 'https://picpay.com' }
+    ];
+
+    const SYNONYMS_MAP = {
+      "desenvolvedor": ["developer", "software engineer", "frontend", "backend", "fullstack", "programador", "engenheiro"],
+      "dev": ["developer", "software engineer", "frontend", "backend", "fullstack"],
+      "designer": ["product designer", "ux designer", "ui designer", "ui/ux", "web designer", "ux", "design"],
+      "dados": ["data analyst", "data engineer", "data scientist", "analista de dados", "analytics"],
+      "produto": ["product manager", "product owner", "gerente de produto", "pm", "po"],
+      "marketing": ["growth", "social media", "content", "copywriter", "marketing digital"],
+      "vendas": ["sales", "sdr", "bdr", "account executive", "comercial"],
+      "financeiro": ["analista financeiro", "financial analyst", "finanças", "controladoria"]
+    };
+
+    let currentFilterStatus = 'todas';
+    let searchDebounceTimeout = null;
+
+    // Utilitários de Storage
+    function getStoredProfile() {
+      const p = localStorage.getItem('vagas_user_profile');
+      if (p) {
+        try { return JSON.parse(p); } catch (e) {}
+      }
+      return {
+        name: '',
+        email: '',
+        resume_text: '',
+        target_roles: ['Designer', 'Product Designer'],
+        negative_keywords: [],
+        min_salary: 0,
+        work_modes: ['remote'],
+        employment_types: ['CLT', 'PJ'],
+        ai_provider: 'gemini',
+        ai_api_key: '',
+        ai_model: 'gemini-3-flash-preview'
+      };
+    }
+
+    function saveStoredProfile(p) {
+      localStorage.setItem('vagas_user_profile', JSON.stringify(p));
+    }
+
+    function getStoredJobs() {
+      const j = localStorage.getItem('vagas_saved_jobs');
+      return j ? JSON.parse(j) : [];
+    }
+
+    function saveStoredJobs(jobs) {
+      localStorage.setItem('vagas_saved_jobs', JSON.stringify(jobs));
+    }
+
+    function getStoredEvaluations() {
+      const e = localStorage.getItem('vagas_evaluations');
+      return e ? JSON.parse(e) : {};
+    }
+
+    function saveStoredEvaluations(evals) {
+      localStorage.setItem('vagas_evaluations', JSON.stringify(evals));
+    }
+
+    function getStoredCompanies() {
+      const c = localStorage.getItem('vagas_companies');
+      if (c) {
+        try { return JSON.parse(c); } catch (e) {}
+      }
+      return DEFAULT_COMPANIES;
+    }
+
+    function saveStoredCompanies(comps) {
+      localStorage.setItem('vagas_companies', JSON.stringify(comps));
+    }
+
+    // Alternar Abas
+    function switchTab(tab) {
+      document.getElementById('tabFeed').classList.add('hidden');
+      document.getElementById('tabProfile').classList.add('hidden');
+      document.getElementById('tabCompanies').classList.add('hidden');
+
+      const btnFeed = document.getElementById('btnNavFeed');
+      const btnProfile = document.getElementById('btnNavProfile');
+      const btnCompanies = document.getElementById('btnNavCompanies');
+
+      [btnFeed, btnProfile, btnCompanies].forEach(b => {
+        b.className = "px-3.5 py-2 rounded-lg text-sm font-semibold transition text-slate-600 hover:bg-slate-100";
+      });
+
+      if (tab === 'feed') {
+        document.getElementById('tabFeed').classList.remove('hidden');
+        btnFeed.className = "px-3.5 py-2 rounded-lg text-sm font-semibold transition bg-indigo-50 text-indigo-700";
+        loadJobs();
+        loadStats();
+      } else if (tab === 'profile') {
+        document.getElementById('tabProfile').classList.remove('hidden');
+        btnProfile.className = "px-3.5 py-2 rounded-lg text-sm font-semibold transition bg-indigo-50 text-indigo-700";
+        loadProfile();
+      } else if (tab === 'companies') {
+        document.getElementById('tabCompanies').classList.remove('hidden');
+        btnCompanies.className = "px-3.5 py-2 rounded-lg text-sm font-semibold transition bg-indigo-50 text-indigo-700";
+        loadCompanies();
+      }
+    }
+
+    // Carregar Perfil na Interface
+    function loadProfile() {
+      const p = getStoredProfile();
+      document.getElementById('profName').value = p.name || '';
+      document.getElementById('profEmail').value = p.email || '';
+      document.getElementById('profResumeText').value = p.resume_text || '';
+      document.getElementById('profTargetRoles').value = (p.target_roles || []).join(', ');
+      document.getElementById('profNegativeKeywords').value = (p.negative_keywords || []).join(', ');
+      document.getElementById('profMinSalary').value = p.min_salary || 0;
+
+      const modes = p.work_modes || ['remote'];
+      document.getElementById('modeRemote').checked = modes.includes('remote');
+      document.getElementById('modeHybrid').checked = modes.includes('hybrid');
+      document.getElementById('modeOnsite').checked = modes.includes('onsite');
+
+      const types = p.employment_types || ['CLT', 'PJ'];
+      document.getElementById('typeCLT').checked = types.includes('CLT');
+      document.getElementById('typePJ').checked = types.includes('PJ');
+
+      document.getElementById('profAIProvider').value = p.ai_provider || 'gemini';
+      updateAIModelOptions();
+      document.getElementById('profAIModel').value = p.ai_model || 'gemini-3-flash-preview';
+      document.getElementById('profAIApiKey').value = p.ai_api_key || '';
+
+      if (p.name) {
+        document.getElementById('headerSubtitle').innerText = `Agente de: ${p.name}`;
+      }
+    }
+
+    function saveProfile() {
+      const targetRoles = document.getElementById('profTargetRoles').value.split(',').map(s => s.trim()).filter(Boolean);
+      const negKeywords = document.getElementById('profNegativeKeywords').value.split(',').map(s => s.trim()).filter(Boolean);
+
+      const workModes = [];
+      if (document.getElementById('modeRemote').checked) workModes.push('remote');
+      if (document.getElementById('modeHybrid').checked) workModes.push('hybrid');
+      if (document.getElementById('modeOnsite').checked) workModes.push('onsite');
+
+      const empTypes = [];
+      if (document.getElementById('typeCLT').checked) empTypes.push('CLT');
+      if (document.getElementById('typePJ').checked) empTypes.push('PJ');
+
+      const profile = {
+        name: document.getElementById('profName').value || 'Meu Perfil',
+        email: document.getElementById('profEmail').value || '',
+        resume_text: document.getElementById('profResumeText').value || '',
+        target_roles: targetRoles,
+        negative_keywords: negKeywords,
+        min_salary: parseFloat(document.getElementById('profMinSalary').value) || 0,
+        work_modes: workModes,
+        employment_types: empTypes,
+        ai_provider: document.getElementById('profAIProvider').value,
+        ai_api_key: document.getElementById('profAIApiKey').value.trim(),
+        ai_model: document.getElementById('profAIModel').value
+      };
+
+      saveStoredProfile(profile);
+      showToast('Configurações salvas no navegador com sucesso!', 'success');
+      loadProfile();
+    }
+
+    function updateAIModelOptions() {
+      const provider = document.getElementById('profAIProvider').value;
+      const modelSelect = document.getElementById('profAIModel');
+      modelSelect.innerHTML = '';
+      if (provider === 'gemini') {
+        modelSelect.innerHTML = `
+          <option value="gemini-3-flash-preview">Gemini 3 Flash Preview (Recomendado & Grátis)</option>
+          <option value="gemini-3.1-flash-lite-preview">Gemini 3.1 Flash-Lite (Ultra Rápido)</option>
+          <option value="gemini-flash-latest">Gemini Flash Latest</option>
+        `;
+      } else {
+        modelSelect.innerHTML = `
+          <option value="gpt-4o-mini">GPT-4o Mini (Econômico)</option>
+          <option value="gpt-4o">GPT-4o (Completo)</option>
+        `;
+      }
+    }
+
+    // Leitura de Currículo PDF 100% no Navegador
+    async function handleResumeUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      if (file.name.endsWith('.txt')) {
+        const text = await file.text();
+        document.getElementById('profResumeText').value = text;
+        showToast('Texto do currículo carregado!', 'success');
+        return;
+      }
+
+      if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
+        showToast('Lendo PDF diretamente no navegador...', 'info');
+        try {
+          const arrayBuffer = await file.arrayBuffer();
+          const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+          let fullText = '';
+          for (let i = 1; i <= pdf.numPages; i++) {
+            const page = await pdf.getPage(i);
+            const content = await page.getTextContent();
+            const pageText = content.items.map(item => item.str).join(' ');
+            fullText += pageText + '\n\n';
+          }
+
+          document.getElementById('profResumeText').value = fullText.trim();
+          showToast('Currículo extraído com sucesso!', 'success');
+          if (confirm('Deseja que a IA analise este currículo agora para sugerir cargos e preencher seus dados automaticamente?')) {
+            autocompleteProfileAI();
+          }
+        } catch (err) {
+          showToast('Erro ao ler PDF: ' + err.message, 'error');
+        }
+      }
+    }
+
+    // Chamada Direta ao Gemini / OpenAI
+    async function callAI(prompt, apiKey, provider = 'gemini', model = 'gemini-3-flash-preview') {
+      const cleanedKey = apiKey.trim().replace(/^["']|["']$/g, '');
+      if (!cleanedKey) throw new Error('Chave de API não informada.');
+
+      if (provider === 'gemini') {
+        const candidateModels = [model, 'gemini-3-flash-preview', 'gemini-3.1-flash-lite-preview', 'gemini-flash-latest'];
+        const uniqueModels = [...new Set(candidateModels)];
+
+        for (const m of uniqueModels) {
+          try {
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent`;
+            const res = await fetch(url, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'x-goog-api-key': cleanedKey
+              },
+              body: JSON.stringify({
+                contents: [{ parts: [{ text: prompt }] }],
+                generationConfig: {
+                  temperature: 0.2,
+                  responseMimeType: 'application/json'
+                }
+              })
+            });
+
+            if (res.ok) {
+              const data = await res.json();
+              const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+              if (text) return JSON.parse(text);
+            }
+          } catch (e) {}
+        }
+        throw new Error('Não foi possível obter resposta dos modelos do Gemini. Verifique sua chave.');
+      } else {
+        const res = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${cleanedKey}`
+          },
+          body: JSON.stringify({
+            model: model || 'gpt-4o-mini',
+            messages: [{ role: 'user', content: prompt }],
+            response_format: { type: 'json_object' }
+          })
+        });
+        if (!res.ok) throw new Error(`Erro OpenAI: ${res.statusText}`);
+        const data = await res.json();
+        return JSON.parse(data.choices[0].message.content);
+      }
+    }
+
+    // Teste de Conexão com IA
+    async function testAIConnection() {
+      const provider = document.getElementById('profAIProvider').value;
+      const apiKey = document.getElementById('profAIApiKey').value.trim();
+      const model = document.getElementById('profAIModel').value;
+      const feedback = document.getElementById('aiTestFeedback');
+
+      feedback.classList.remove('hidden', 'text-emerald-600', 'text-rose-600');
+      feedback.classList.add('text-slate-500');
+      feedback.innerText = 'Testando conexão direto com o Google Gemini...';
+
+      try {
+        const res = await callAI('Responda exclusivamente o JSON: {"status": "ok", "msg": "conexao ativa"}', apiKey, provider, model);
+        feedback.classList.remove('text-slate-500');
+        if (res.status === 'ok') {
+          feedback.classList.add('text-emerald-600');
+          feedback.innerText = '✓ Conexão bem-sucedida! Sua chave está funcionando perfeitamente.';
+        } else {
+          feedback.classList.add('text-rose-600');
+          feedback.innerText = '✗ Resposta inesperada da IA.';
+        }
+      } catch (err) {
+        feedback.classList.remove('text-slate-500');
+        feedback.classList.add('text-rose-600');
+        feedback.innerText = `✗ Erro ao conectar: ${err.message}`;
+      }
+    }
+
+    // Autocompletar Perfil com IA
+    async function autocompleteProfileAI() {
+      const resumeText = document.getElementById('profResumeText').value;
+      const apiKey = document.getElementById('profAIApiKey').value.trim();
+      const provider = document.getElementById('profAIProvider').value;
+      const model = document.getElementById('profAIModel').value;
+
+      if (!resumeText) return alert('Cole o texto do currículo antes de autocompletar.');
+      if (!apiKey) return alert('Preencha sua chave de IA para permitir a análise.');
+
+      showToast('Analisando currículo com IA...', 'info');
+      const prompt = `Analise este currículo e extraia o nome e 3 a 5 cargos ideais.
+CURRÍCULO:
+"""${resumeText.slice(0, 4000)}"""
+Responda EXCLUSIVAMENTE em formato JSON:
+{"name": "Nome", "suggested_roles": ["Cargo 1", "Cargo 2"]}`;
+
+      try {
+        const res = await callAI(prompt, apiKey, provider, model);
+        if (res.name && !document.getElementById('profName').value) {
+          document.getElementById('profName').value = res.name;
+        }
+        if (res.suggested_roles && res.suggested_roles.length > 0) {
+          document.getElementById('profTargetRoles').value = res.suggested_roles.join(', ');
+        }
+        showToast('Perfil preenchido pela IA com sucesso!', 'success');
+      } catch (err) {
+        showToast('Erro na análise da IA: ' + err.message, 'error');
+      }
+    }
+
+    // Gerador de Hash para Desduplicação
+    async function generateHash(str) {
+      const msgBuffer = new TextEncoder().encode(str);
+      const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+
+    // Expansão de Sinônimos
+    function expandSearchTerms(terms) {
+      const expanded = new Set();
+      terms.forEach(t => {
+        const clean = t.trim().toLowerCase();
+        if (!clean) return;
+        expanded.add(clean);
+        for (const [key, syns] of Object.entries(SYNONYMS_MAP)) {
+          if (clean.includes(key)) {
+            syns.forEach(s => expanded.add(s));
+          }
+        }
+      });
+      return Array.from(expanded);
+    }
+
+    // COLETA DE VAGAS DIRETAMENTE DO NAVEGADOR
+    async function fetchAllJobs(terms, companies) {
+      const collected = [];
+      const normalizedTerms = terms.map(t => t.toLowerCase());
+
+      // 1. Greenhouse Boards
+      for (const comp of companies) {
+        if (!comp.greenhouse_board_token) continue;
+        try {
+          const res = await fetch(`https://boards-api.greenhouse.io/v1/boards/${comp.greenhouse_board_token}/jobs?content=true`);
+          if (!res.ok) continue;
+          const data = await res.json();
+          const jobs = data.jobs || [];
+
+          for (const j of jobs) {
+            const titleLower = (j.title || '').toLowerCase();
+            if (!normalizedTerms.some(term => titleLower.includes(term))) continue;
+
+            const loc = j.location?.name || 'Brasil';
+            const isRemote = loc.toLowerCase().includes('remote') || loc.toLowerCase().includes('remoto');
+            const cleanDesc = (j.content || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+            const hash = await generateHash(`${comp.name}|${j.title}|${cleanDesc.slice(0, 1000)}`);
+
+            collected.push({
+              source: 'greenhouse',
+              external_id: String(j.id),
+              company_name: comp.name,
+              title: j.title,
+              location: loc,
+              remote_type: isRemote ? 'remote' : null,
+              description: cleanDesc,
+              application_url: j.absolute_url,
+              salary_min: null,
+              salary_max: null,
+              content_hash: hash,
+              published_at: j.updated_at
+            });
+          }
+        } catch (e) {}
+      }
+
+      // 2. Lever Postings
+      for (const comp of companies) {
+        if (!comp.lever_site) continue;
+        try {
+          const res = await fetch(`https://api.lever.co/v0/postings/${comp.lever_site}?mode=json`);
+          if (!res.ok) continue;
+          const postings = await res.json();
+
+          for (const p of postings) {
+            const titleLower = (p.text || '').toLowerCase();
+            if (!normalizedTerms.some(term => titleLower.includes(term))) continue;
+
+            const loc = p.categories?.location || 'Brasil';
+            const isRemote = (p.categories?.workplaceType || '').toLowerCase().includes('remote') || loc.toLowerCase().includes('remoto');
+            const cleanDesc = (p.descriptionPlain || p.description || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+            const hash = await generateHash(`${comp.name}|${p.text}|${cleanDesc.slice(0, 1000)}`);
+
+            collected.push({
+              source: 'lever',
+              external_id: String(p.id),
+              company_name: comp.name,
+              title: p.text,
+              location: loc,
+              remote_type: isRemote ? 'remote' : null,
+              description: cleanDesc,
+              application_url: p.hostedUrl,
+              salary_min: null,
+              salary_max: null,
+              content_hash: hash,
+              published_at: p.createdAt
+            });
+          }
+        } catch (e) {}
+      }
+
+      // 3. Remotive API
+      try {
+        const res = await fetch('https://remotive.com/api/remote-jobs?limit=50');
+        if (res.ok) {
+          const data = await res.json();
+          for (const r of data.jobs || []) {
+            const titleLower = (r.title || '').toLowerCase();
+            if (!normalizedTerms.some(term => titleLower.includes(term))) continue;
+
+            const cleanDesc = (r.description || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+            const hash = await generateHash(`${r.company_name}|${r.title}|${cleanDesc.slice(0, 1000)}`);
+
+            collected.push({
+              source: 'remotive',
+              external_id: String(r.id),
+              company_name: r.company_name,
+              title: r.title,
+              location: r.candidate_required_location || 'Remote (Worldwide)',
+              remote_type: 'remote',
+              description: cleanDesc,
+              application_url: r.url,
+              salary_min: null,
+              salary_max: null,
+              content_hash: hash,
+              published_at: r.publication_date
+            });
+          }
+        }
+      } catch (e) {}
+
+      // 4. RemoteOK API
+      try {
+        const res = await fetch('https://remoteok.com/api');
+        if (res.ok) {
+          const raw = await res.json();
+          const postings = Array.isArray(raw) ? raw.filter(p => p && p.id) : [];
+          for (const p of postings) {
+            const tags = Array.isArray(p.tags) ? p.tags.join(' ') : '';
+            const combined = `${p.position || ''} ${tags}`.toLowerCase();
+            if (!normalizedTerms.some(term => combined.includes(term))) continue;
+
+            const cleanDesc = (p.description || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+            const hash = await generateHash(`${p.company}|${p.position}|${cleanDesc.slice(0, 1000)}`);
+
+            collected.push({
+              source: 'remoteok',
+              external_id: String(p.id),
+              company_name: p.company || 'Empresa Confidencial',
+              title: p.position,
+              location: p.location || 'Remote',
+              remote_type: 'remote',
+              description: cleanDesc,
+              application_url: p.url,
+              salary_min: p.salary_min || null,
+              salary_max: p.salary_max || null,
+              content_hash: hash,
+              published_at: p.date
+            });
+          }
+        }
+      } catch (e) {}
+
+      return collected;
+    }
+
+    // AVALIAÇÃO DE UMA VAGA COM IA
+    async function evaluateJobWithAI(job, profile) {
+      if (!profile.ai_api_key) {
+        return {
+          score: 50,
+          seniority: 'Aguardando',
+          qualified: true,
+          positives: ['Vaga capturada por título compatível'],
+          concerns: ['Configure sua chave de IA nas opções para ter a análise profunda'],
+          reasoning: 'Vaga identificada por compatibilidade de título. Aguardando análise da IA.',
+          evaluated_at: new Date().toISOString()
+        };
+      }
+
+      const prompt = `Você é um recrutador sênior. Avalie minuciosamente a compatibilidade entre a VAGA e o CANDIDATO.
+
+PERFIL DO CANDIDATO:
+- Nome: ${profile.name}
+- Cargos Alvos: ${(profile.target_roles || []).join(', ')}
+- Termos a Evitar: ${(profile.negative_keywords || []).join(', ')}
+- Modalidades: ${(profile.work_modes || []).join(', ')}
+- Pretensão Salarial Mínima: R$ ${profile.min_salary || 0}
+- Currículo:
+"""${profile.resume_text.slice(0, 3000)}"""
+
+VAGA A SER AVALIADA:
+- Título: ${job.title}
+- Empresa: ${job.company_name}
+- Localização: ${job.location}
+- Modalidade: ${job.remote_type || 'Presencial/Híbrido'}
+- Descrição:
+"""${job.description.slice(0, 3000)}"""
+
+REGRAS:
+1. PONTUAÇÃO (0 a 100): Avalie technical_score (peso 25%), experience_score (peso 25%), seniority_score (peso 20%), remote_score (15%), salary_score (15%). Score final ponderado de 0 a 100.
+2. Sênioridade estimada (ex: Júnior, Pleno, Sênior, Staff).
+3. 2 a 3 pontos fortes (positives) e 1 a 2 pontos de alerta (concerns).
+4. reasoning: 2 a 3 frases explicativas.
+5. qualified: true se score >= 65.
+
+Responda EXCLUSIVAMENTE em formato JSON:
+{
+  "score": 85,
+  "seniority": "Sênior",
+  "qualified": true,
+  "positives": ["...", "..."],
+  "concerns": ["..."],
+  "reasoning": "..."
+}`;
+
+      const res = await callAI(prompt, profile.ai_api_key, profile.ai_provider, profile.ai_model);
+      res.evaluated_at = new Date().toISOString();
+      return res;
+    }
+
+    // EXECUTAR BUSCA COMPLETA
+    async function triggerSearch() {
+      const modal = document.getElementById('searchModal');
+      modal.classList.remove('hidden');
+
+      const profile = getStoredProfile();
+      const companies = getStoredCompanies();
+      const existingJobs = getStoredJobs();
+      const existingEvals = getStoredEvaluations();
+
+      const expandedTerms = expandSearchTerms(profile.target_roles || ['Designer']);
+
+      try {
+        const newlyFetched = await fetchAllJobs(expandedTerms, companies);
+        
+        let newCount = 0;
+        const jobMap = new Map();
+        existingJobs.forEach(j => jobMap.set(j.content_hash, j));
+
+        for (const j of newlyFetched) {
+          if (!jobMap.has(j.content_hash)) {
+            jobMap.set(j.content_hash, j);
+            newCount++;
+            // Se ainda não tem avaliação, define a inicial
+            if (!existingEvals[j.content_hash]) {
+              existingEvals[j.content_hash] = {
+                score: 50,
+                seniority: 'Aguardando',
+                qualified: true,
+                positives: ['Palavras-chave correspondem ao cargo desejado'],
+                concerns: ['Aguardando análise da IA'],
+                reasoning: 'Vaga capturada por título compatível. Clique para analisar com IA.',
+                status: 'nova',
+                evaluated_at: new Date().toISOString()
+              };
+            }
+          }
+        }
+
+        const mergedJobs = Array.from(jobMap.values());
+        saveStoredJobs(mergedJobs);
+        saveStoredEvaluations(existingEvals);
+
+        modal.classList.add('hidden');
+        showToast(`Busca concluída! ${mergedJobs.length} vagas no catálogo (${newCount} novas capturadas).`, 'success');
+        loadJobs();
+        loadStats();
+      } catch (err) {
+        modal.classList.add('hidden');
+        showToast('Erro ao buscar vagas: ' + err.message, 'error');
+      }
+    }
+
+    // AVALIAR CARD ESPECÍFICO IN-PLACE
+    async function evaluateJobCardNow(contentHash, btn) {
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Analisando com IA...';
+      }
+
+      const profile = getStoredProfile();
+      if (!profile.ai_api_key) {
+        alert('Por favor, configure sua chave do Gemini na aba "Meu Agente" antes de avaliar.');
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles text-indigo-500 mr-1"></i> Avaliar com IA Agora';
+        }
+        return;
+      }
+
+      const jobs = getStoredJobs();
+      const evals = getStoredEvaluations();
+      const job = jobs.find(j => j.content_hash === contentHash);
+
+      if (!job) return;
+
+      try {
+        const evaluation = await evaluateJobWithAI(job, profile);
+        evaluation.status = evals[contentHash]?.status || 'nova';
+        evals[contentHash] = evaluation;
+        saveStoredEvaluations(evals);
+
+        const cardEl = document.getElementById(`job-card-${contentHash}`);
+        if (cardEl) {
+          cardEl.outerHTML = renderSingleJobCard(job, evaluation);
+          const newCard = document.getElementById(`job-card-${contentHash}`);
+          if (newCard) {
+            newCard.classList.add('ring-2', 'ring-emerald-500');
+            setTimeout(() => newCard.classList.remove('ring-2', 'ring-emerald-500'), 3000);
+          }
+        }
+
+        showToast(`Vaga avaliada com IA! Match: ${evaluation.score}%`, 'success');
+        loadStats();
+      } catch (err) {
+        showToast('Erro na avaliação: ' + err.message, 'error');
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles text-indigo-500 mr-1"></i> Avaliar com IA Agora';
+        }
+      }
+    }
+
+    // Ações de Vaga
+    function setJobStatus(contentHash, newStatus) {
+      const evals = getStoredEvaluations();
+      if (!evals[contentHash]) {
+        evals[contentHash] = { score: 50, status: 'nova' };
+      }
+      evals[contentHash].status = newStatus;
+      saveStoredEvaluations(evals);
+      loadJobs();
+      loadStats();
+    }
+
+    // Renderizar Card Único
+    function renderSingleJobCard(j, e) {
+      const isPendingAI = !e.score || (e.reasoning && (e.reasoning.includes('Aguardando') || e.reasoning.includes('Clique para analisar')));
+      const scoreColor = e.score >= 80 ? 'text-emerald-600 bg-emerald-50 border-emerald-200' :
+                         e.score >= 65 ? 'text-indigo-600 bg-indigo-50 border-indigo-200' :
+                         'text-amber-600 bg-amber-50 border-amber-200';
+
+      const scoreBadge = isPendingAI
+        ? `<div class="px-3 py-1.5 rounded-xl border font-bold text-xs bg-slate-100 text-slate-600 border-slate-200 flex items-center gap-1.5"><i class="fa-solid fa-clock text-xs text-slate-400"></i><span>Aguardando IA</span></div>`
+        : `<div class="px-3.5 py-1.5 rounded-xl border font-extrabold text-sm flex items-center gap-1.5 ${scoreColor}"><i class="fa-solid fa-chart-pie text-xs"></i><span>${e.score}% Match</span></div>`;
+
+      const isFavorite = e.status === 'favorita';
+      const isApplied = e.status === 'candidatado';
+
+      return `
+        <div id="job-card-${j.content_hash}" class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 hover:shadow-md transition">
+          <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-3">
+            <div class="flex-1">
+              <div class="flex flex-wrap items-center gap-2 mb-1.5">
+                <span class="text-xs font-bold uppercase tracking-wider text-slate-400">${j.source}</span>
+                ${j.remote_type === 'remote' ? '<span class="px-2 py-0.5 rounded-md text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-100"><i class="fa-solid fa-house-laptop mr-1"></i>Remoto</span>' : ''}
+                ${e.seniority && e.seniority !== 'N/A' && e.seniority !== 'Aguardando' ? `<span class="px-2 py-0.5 rounded-md text-[11px] font-bold bg-slate-100 text-slate-700">${e.seniority}</span>` : ''}
+                ${j.salary_min || j.salary_max ? `<span class="px-2 py-0.5 rounded-md text-[11px] font-bold bg-amber-50 text-amber-700"><i class="fa-solid fa-money-bill-wave mr-1"></i>R$ ${j.salary_min || 0} - ${j.salary_max || 0}</span>` : ''}
+              </div>
+              <h3 class="text-lg font-bold text-slate-900 leading-snug">${escapeHtml(j.title)}</h3>
+              <p class="text-xs font-semibold text-slate-600 mt-0.5">
+                <i class="fa-solid fa-building mr-1 text-slate-400"></i> ${escapeHtml(j.company_name)}
+                ${j.location ? `<span class="mx-1.5 text-slate-300">•</span><i class="fa-solid fa-location-dot mr-1 text-slate-400"></i> ${escapeHtml(j.location)}` : ''}
+              </p>
+            </div>
+
+            <!-- Score Badge -->
+            <div class="flex sm:flex-col items-center sm:items-end justify-between border-t sm:border-t-0 pt-3 sm:pt-0 border-slate-100">
+              ${scoreBadge}
+              <span class="text-[11px] text-slate-400 font-medium mt-1">${formatTimeAgo(e.evaluated_at)}</span>
+            </div>
+          </div>
+
+          <!-- Parecer da IA -->
+          <div class="bg-slate-50 rounded-xl p-3.5 mb-4 border border-slate-100">
+            <p class="text-xs text-slate-700 mb-2 font-medium leading-relaxed">
+              <strong class="text-indigo-600">Parecer da IA:</strong> ${escapeHtml(e.reasoning || 'Sem justificativa')}
+            </p>
+            
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+              ${(e.positives || []).length > 0 ? `
+                <div class="bg-emerald-50/70 p-2.5 rounded-lg border border-emerald-100">
+                  <p class="font-bold text-emerald-800 text-[11px] mb-1"><i class="fa-solid fa-thumbs-up mr-1"></i> Pontos Fortes:</p>
+                  <ul class="list-disc list-inside text-emerald-700 text-[11px] space-y-0.5">
+                    ${e.positives.map(p => `<li>${escapeHtml(p)}</li>`).join('')}
+                  </ul>
+                </div>
+              ` : ''}
+              ${(e.concerns || []).length > 0 ? `
+                <div class="bg-amber-50/70 p-2.5 rounded-lg border border-amber-100">
+                  <p class="font-bold text-amber-800 text-[11px] mb-1"><i class="fa-solid fa-triangle-exclamation mr-1"></i> Pontos de Atenção:</p>
+                  <ul class="list-disc list-inside text-amber-700 text-[11px] space-y-0.5">
+                    ${e.concerns.map(c => `<li>${escapeHtml(c)}</li>`).join('')}
+                  </ul>
+                </div>
+              ` : ''}
+            </div>
+          </div>
+
+          <!-- Footer Actions -->
+          <div class="flex flex-wrap items-center justify-between gap-3 pt-2">
+            <div class="flex items-center gap-1.5">
+              ${isPendingAI ? `
+                <button onclick="evaluateJobCardNow('${j.content_hash}', this)" class="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-xs font-bold transition flex items-center gap-1.5 border border-indigo-200">
+                  <i class="fa-solid fa-wand-magic-sparkles text-indigo-500"></i> Avaliar com IA Agora
+                </button>
+              ` : ''}
+              <button onclick="setJobStatus('${j.content_hash}', '${isFavorite ? 'nova' : 'favorita'}')" class="px-3 py-1.5 rounded-lg text-xs font-bold transition ${isFavorite ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}">
+                <i class="fa-${isFavorite ? 'solid' : 'regular'} fa-star mr-1"></i> ${isFavorite ? 'Favoritada' : 'Favoritar'}
+              </button>
+              <button onclick="setJobStatus('${j.content_hash}', '${isApplied ? 'nova' : 'candidatado'}')" class="px-3 py-1.5 rounded-lg text-xs font-bold transition ${isApplied ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}">
+                <i class="fa-solid fa-paper-plane mr-1"></i> ${isApplied ? 'Candidatado' : 'Já me Canditatei'}
+              </button>
+              <button onclick="setJobStatus('${j.content_hash}', 'descartada')" class="px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition" title="Descartar vaga">
+                <i class="fa-solid fa-trash-can"></i>
+              </button>
+            </div>
+
+            <a href="${j.application_url}" target="_blank" class="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold shadow-sm transition flex items-center gap-1.5">
+              <span>Ver Vaga e Candidatar</span>
+              <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
+            </a>
+          </div>
+        </div>
+      `;
+    }
+
+    // Listar e Filtrar Vagas
+    function setFilterStatus(status) {
+      currentFilterStatus = status;
+      document.querySelectorAll('.filter-btn').forEach(btn => {
+        if (btn.getAttribute('data-status') === status) {
+          btn.className = "filter-btn px-3 py-1.5 rounded-lg text-xs font-bold transition bg-slate-900 text-white";
+        } else {
+          btn.className = "filter-btn px-3 py-1.5 rounded-lg text-xs font-bold transition bg-slate-100 text-slate-600 hover:bg-slate-200";
+        }
+      });
+      loadJobs();
+    }
+
+    function debounceSearch() {
+      clearTimeout(searchDebounceTimeout);
+      searchDebounceTimeout = setTimeout(loadJobs, 250);
+    }
+
+    function loadJobs() {
+      const search = (document.getElementById('searchInput').value || '').toLowerCase();
+      const minScore = parseInt(document.getElementById('scoreFilter').value, 10);
+
+      const jobs = getStoredJobs();
+      const evals = getStoredEvaluations();
+
+      const filtered = jobs.filter(j => {
+        const e = evals[j.content_hash] || { score: 50, status: 'nova' };
+        
+        // Filtro de status
+        if (currentFilterStatus !== 'todas' && e.status !== currentFilterStatus) return false;
+
+        // Filtro de score mínimo
+        if (!isNaN(minScore) && (e.score || 0) < minScore) return false;
+
+        // Filtro de busca textual
+        if (search) {
+          const text = `${j.title} ${j.company_name} ${j.description}`.toLowerCase();
+          if (!text.includes(search)) return false;
+        }
+
+        return true;
+      });
+
+      // Ordenação: primeiro as vagas já avaliadas por score decrescente, depois as pendentes
+      filtered.sort((a, b) => {
+        const ea = evals[a.content_hash] || { score: 50, reasoning: 'Aguardando' };
+        const eb = evals[b.content_hash] || { score: 50, reasoning: 'Aguardando' };
+        const aPending = !ea.score || (ea.reasoning && ea.reasoning.includes('Aguardando'));
+        const bPending = !eb.score || (eb.reasoning && eb.reasoning.includes('Aguardando'));
+
+        if (aPending && !bPending) return 1;
+        if (!aPending && bPending) return -1;
+        return (eb.score || 0) - (ea.score || 0);
+      });
+
+      const container = document.getElementById('jobsList');
+      const empty = document.getElementById('emptyState');
+
+      if (filtered.length === 0) {
+        container.innerHTML = '';
+        empty.classList.remove('hidden');
+        return;
+      }
+
+      empty.classList.add('hidden');
+      container.innerHTML = filtered.map(j => {
+        const e = evals[j.content_hash] || { score: 50, status: 'nova' };
+        return renderSingleJobCard(j, e);
+      }).join('');
+    }
+
+    function loadStats() {
+      const jobs = getStoredJobs();
+      const evals = getStoredEvaluations();
+
+      let highMatch = 0;
+      let favorites = 0;
+      let applied = 0;
+
+      for (const j of jobs) {
+        const e = evals[j.content_hash];
+        if (e) {
+          if (e.score >= 70 && e.qualified) highMatch++;
+          if (e.status === 'favorita') favorites++;
+          if (e.status === 'candidatado') applied++;
+        }
+      }
+
+      document.getElementById('statTotalJobs').innerText = jobs.length;
+      document.getElementById('statHighMatch').innerText = highMatch;
+      document.getElementById('statFavorites').innerText = favorites;
+      document.getElementById('statApplied').innerText = applied;
+    }
+
+    // Gerenciamento de Empresas
+    function loadCompanies() {
+      const comps = getStoredCompanies();
+      const tbody = document.getElementById('companiesTableBody');
+      tbody.innerHTML = comps.map(c => `
+        <tr class="hover:bg-slate-50">
+          <td class="py-3 px-4 font-bold text-slate-900">${escapeHtml(c.name)}</td>
+          <td class="py-3 px-4">${escapeHtml(c.country_code || 'BR')}</td>
+          <td class="py-3 px-4 font-mono text-[11px] text-slate-500">
+            ${c.greenhouse_board_token ? `<span class="bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded">Greenhouse: ${escapeHtml(c.greenhouse_board_token)}</span> ` : ''}
+            ${c.lever_site ? `<span class="bg-blue-50 text-blue-700 px-2 py-0.5 rounded">Lever: ${escapeHtml(c.lever_site)}</span>` : ''}
+          </td>
+          <td class="py-3 px-4">
+            ${c.website ? `<a href="${c.website}" target="_blank" class="text-indigo-600 hover:underline">Acessar site ↗</a>` : '-'}
+          </td>
+          <td class="py-3 px-4 text-right">
+            <button onclick="removeCompany(${c.id})" class="text-slate-400 hover:text-rose-600 transition" title="Remover"><i class="fa-solid fa-trash"></i></button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function openAddCompanyModal() { document.getElementById('addCompanyModal').classList.remove('hidden'); }
+    function closeAddCompanyModal() { document.getElementById('addCompanyModal').classList.add('hidden'); }
+
+    function handleSaveCompany(e) {
+      e.preventDefault();
+      const name = document.getElementById('newCompName').value.trim();
+      const gh = document.getElementById('newCompGreenhouse').value.trim() || null;
+      const lever = document.getElementById('newCompLever').value.trim() || null;
+      const web = document.getElementById('newCompWebsite').value.trim() || null;
+
+      const comps = getStoredCompanies();
+      comps.push({
+        id: Date.now(),
+        name,
+        country_code: 'BR',
+        greenhouse_board_token: gh,
+        lever_site: lever,
+        website: web
+      });
+      saveStoredCompanies(comps);
+      closeAddCompanyModal();
+      showToast('Empresa adicionada com sucesso!', 'success');
+      loadCompanies();
+    }
+
+    function removeCompany(id) {
+      let comps = getStoredCompanies();
+      comps = comps.filter(c => c.id !== id);
+      saveStoredCompanies(comps);
+      loadCompanies();
+      showToast('Empresa removida.', 'info');
+    }
+
+    // Exportar / Importar Dados
+    function exportUserData() {
+      const data = {
+        profile: getStoredProfile(),
+        jobs: getStoredJobs(),
+        evaluations: getStoredEvaluations(),
+        companies: getStoredCompanies()
+      };
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `backup_buscador_vagas_${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function importUserData(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        try {
+          const data = JSON.parse(evt.target.result);
+          if (data.profile) saveStoredProfile(data.profile);
+          if (data.jobs) saveStoredJobs(data.jobs);
+          if (data.evaluations) saveStoredEvaluations(data.evaluations);
+          if (data.companies) saveStoredCompanies(data.companies);
+          showToast('Dados restaurados com sucesso!', 'success');
+          loadProfile();
+          loadJobs();
+          loadStats();
+        } catch (err) {
+          showToast('Arquivo de backup inválido.', 'error');
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    // Toast UI
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toastContainer');
+      const toast = document.createElement('div');
+      const colors = {
+        success: 'bg-emerald-600 text-white',
+        error: 'bg-rose-600 text-white',
+        info: 'bg-slate-900 text-white'
+      };
+      toast.className = `pointer-events-auto px-4 py-2.5 rounded-xl shadow-lg text-xs font-bold transition transform duration-200 ease-out flex items-center gap-2 ${colors[type] || colors.info}`;
+      toast.innerHTML = `<span>${escapeHtml(message)}</span>`;
+      container.appendChild(toast);
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        setTimeout(() => toast.remove(), 300);
+      }, 4000);
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function formatTimeAgo(dateStr) {
+      if (!dateStr) return '';
+      return 'Avaliada recentemente';
+    }
+
+    // Inicialização
+    window.addEventListener('DOMContentLoaded', () => {
+      loadProfile();
+      loadJobs();
+      loadStats();
+    });
+  </script>
+</body>
+</html>
