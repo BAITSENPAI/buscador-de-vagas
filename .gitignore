@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Ambientes virtuais
+venv/
+env/
+ENV/
+
+# Build do PyInstaller
+build/
+dist/
+*.spec
+
+# Banco de dados local (privacidade de currículos locais)
+data/*.db
+data/*.sqlite
+data/*.sqlite3
+
+# Arquivos de ambiente e segredos
+.env
+.env.*
+
+# Logs e IDE
+*.log
+.vscode/
+.idea/

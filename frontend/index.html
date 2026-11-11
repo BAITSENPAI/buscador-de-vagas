@@ -1,0 +1,1210 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Buscador de Vagas com IA — Seu Agente Pessoal</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Font Awesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+    body { font-family: 'Plus Jakarta Sans', sans-serif; }
+    .glass-card { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(8px); }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
+
+  <!-- Top Navigation Bar -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center text-white shadow-md shadow-indigo-100">
+          <i class="fa-solid fa-robot text-lg"></i>
+        </div>
+        <div>
+          <h1 class="font-bold text-lg text-slate-900 leading-tight">Buscador de Vagas IA</h1>
+          <p class="text-xs text-slate-500 font-medium" id="headerSubtitle">Agente Pessoal Autônomo</p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2 sm:gap-3">
+        <button id="btnNavFeed" onclick="switchTab('feed')" class="px-3.5 py-2 rounded-lg text-sm font-semibold transition bg-indigo-50 text-indigo-700">
+          <i class="fa-solid fa-compass mr-1.5"></i> Vagas
+        </button>
+        <button id="btnNavProfile" onclick="switchTab('profile')" class="px-3.5 py-2 rounded-lg text-sm font-semibold transition text-slate-600 hover:bg-slate-100">
+          <i class="fa-solid fa-sliders mr-1.5"></i> Meu Agente
+        </button>
+        <button id="btnNavCompanies" onclick="switchTab('companies')" class="px-3.5 py-2 rounded-lg text-sm font-semibold transition text-slate-600 hover:bg-slate-100">
+          <i class="fa-solid fa-building mr-1.5"></i> Empresas
+        </button>
+
+        <button onclick="triggerSearch()" id="btnTriggerSearch" class="ml-2 px-4 py-2 rounded-lg text-sm font-bold bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md hover:from-indigo-700 hover:to-violet-700 transition flex items-center gap-2">
+          <i class="fa-solid fa-wand-magic-sparkles"></i>
+          <span class="hidden sm:inline">Buscar Vagas Agora</span>
+        </button>
+
+        <div id="userMenu" class="hidden items-center gap-2 pl-3 border-l border-slate-200">
+          <span id="headerUserName" class="text-xs font-bold text-slate-700 bg-slate-100 px-2.5 py-1.5 rounded-lg max-w-[120px] truncate"></span>
+          <button onclick="handleLogout()" class="text-xs text-slate-400 hover:text-rose-600 font-semibold p-1 transition" title="Sair da conta">
+            <i class="fa-solid fa-right-from-bracket"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Auth Modal (Login / Registro com Código de Convite) -->
+  <div id="authModal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-50 flex items-center justify-center hidden">
+    <div class="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full mx-4 shadow-2xl border border-slate-100">
+      <div class="text-center mb-6">
+        <div class="w-14 h-14 rounded-2xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center text-white shadow-lg shadow-indigo-200 mx-auto mb-3">
+          <i class="fa-solid fa-lock text-2xl"></i>
+        </div>
+        <h2 class="text-xl font-extrabold text-slate-900">Buscador de Vagas com IA</h2>
+        <p class="text-xs text-slate-500 mt-1">Acesso exclusivo. Faça login ou utilize seu convite.</p>
+      </div>
+
+      <!-- Auth Tabs -->
+      <div class="flex border-b border-slate-100 mb-5">
+        <button id="tabAuthLoginBtn" type="button" onclick="switchAuthTab('login')" class="flex-1 pb-3 text-xs font-bold border-b-2 border-indigo-600 text-indigo-600">Entrar</button>
+        <button id="tabAuthRegisterBtn" type="button" onclick="switchAuthTab('register')" class="flex-1 pb-3 text-xs font-bold text-slate-400 border-b-2 border-transparent hover:text-slate-600">Criar Conta</button>
+      </div>
+
+      <!-- Login Form -->
+      <form id="loginForm" onsubmit="handleLogin(event)" class="space-y-4">
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Usuário</label>
+          <input type="text" id="loginUsername" required class="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500" placeholder="Seu nome de usuário">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Senha</label>
+          <input type="password" id="loginPassword" required class="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500" placeholder="••••••••">
+        </div>
+        <button type="submit" id="btnLoginSubmit" class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-md transition">Acessar Plataforma</button>
+      </form>
+
+      <!-- Register Form -->
+      <form id="registerForm" onsubmit="handleRegister(event)" class="space-y-3 hidden">
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Seu Nome</label>
+          <input type="text" id="regName" required class="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500" placeholder="Ex: Douglas ou Maria">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Usuário de Acesso</label>
+          <input type="text" id="regUsername" required class="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500" placeholder="Ex: douglas ou maria">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Senha</label>
+          <input type="password" id="regPassword" required class="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500" placeholder="Mínimo 4 caracteres">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1 flex items-center justify-between">
+            <span>Código de Convite Secreto</span>
+            <span class="text-[10px] text-amber-600 font-semibold">Exigido</span>
+          </label>
+          <input type="password" id="regInviteCode" required class="w-full px-3 py-2 border border-amber-300 bg-amber-50/50 rounded-xl text-xs focus:ring-2 focus:ring-amber-500" placeholder="Código fornecido pelo administrador">
+        </div>
+        <button type="submit" id="btnRegisterSubmit" class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-md transition mt-2">Criar Minha Conta</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Notification Toast Container -->
+  <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+  <!-- Loading Overlay Modal for Job Search -->
+  <div id="searchModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center hidden">
+    <div class="bg-white rounded-2xl p-6 sm:p-8 max-w-md w-full mx-4 shadow-2xl text-center">
+      <div class="w-16 h-16 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mx-auto mb-4"></div>
+      <h3 class="text-xl font-bold text-slate-900 mb-2">Buscando e Avaliando Vagas...</h3>
+      <p class="text-sm text-slate-500 mb-4" id="searchProgressText">Consultando fontes de vagas e rodando o agente de IA...</p>
+      <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+        <div class="bg-indigo-600 h-full animate-pulse w-full"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Content Area -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+    <!-- TAB 1: FEED DE VAGAS -->
+    <div id="tabFeed">
+      <!-- Stats Summary -->
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4">
+          <div class="w-12 h-12 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center text-xl font-bold">
+            <i class="fa-solid fa-briefcase"></i>
+          </div>
+          <div>
+            <p class="text-xs font-semibold text-slate-500 uppercase">Total Coletadas</p>
+            <h3 class="text-2xl font-bold text-slate-900" id="statTotalJobs">0</h3>
+          </div>
+        </div>
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4">
+          <div class="w-12 h-12 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center text-xl font-bold">
+            <i class="fa-solid fa-circle-check"></i>
+          </div>
+          <div>
+            <p class="text-xs font-semibold text-slate-500 uppercase">Alta Aderência (&gt;70%)</p>
+            <h3 class="text-2xl font-bold text-slate-900" id="statHighMatch">0</h3>
+          </div>
+        </div>
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4">
+          <div class="w-12 h-12 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center text-xl font-bold">
+            <i class="fa-solid fa-star"></i>
+          </div>
+          <div>
+            <p class="text-xs font-semibold text-slate-500 uppercase">Favoritas</p>
+            <h3 class="text-2xl font-bold text-slate-900" id="statFavorites">0</h3>
+          </div>
+        </div>
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4">
+          <div class="w-12 h-12 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center text-xl font-bold">
+            <i class="fa-solid fa-paper-plane"></i>
+          </div>
+          <div>
+            <p class="text-xs font-semibold text-slate-500 uppercase">Candidatadas</p>
+            <h3 class="text-2xl font-bold text-slate-900" id="statApplied">0</h3>
+          </div>
+        </div>
+      </div>
+
+      <!-- Filters & Search Toolbar -->
+      <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm mb-6 flex flex-col md:flex-row gap-4 items-center justify-between">
+        <div class="flex flex-wrap gap-2 w-full md:w-auto">
+          <button onclick="setFilterStatus('todas')" class="filter-btn px-3 py-1.5 rounded-lg text-xs font-bold transition bg-slate-900 text-white" data-status="todas">Todas</button>
+          <button onclick="setFilterStatus('nova')" class="filter-btn px-3 py-1.5 rounded-lg text-xs font-bold transition bg-slate-100 text-slate-600 hover:bg-slate-200" data-status="nova">Novas</button>
+          <button onclick="setFilterStatus('favorita')" class="filter-btn px-3 py-1.5 rounded-lg text-xs font-bold transition bg-slate-100 text-slate-600 hover:bg-slate-200" data-status="favorita">⭐ Favoritas</button>
+          <button onclick="setFilterStatus('candidatado')" class="filter-btn px-3 py-1.5 rounded-lg text-xs font-bold transition bg-slate-100 text-slate-600 hover:bg-slate-200" data-status="candidatado">💼 Me Canditatei</button>
+          <button onclick="setFilterStatus('descartada')" class="filter-btn px-3 py-1.5 rounded-lg text-xs font-bold transition bg-slate-100 text-slate-600 hover:bg-slate-200" data-status="descartada">Descartadas</button>
+        </div>
+
+        <div class="flex items-center gap-3 w-full md:w-auto">
+          <div class="relative w-full md:w-64">
+            <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-xs"></i>
+            <input type="text" id="searchInput" oninput="debounceSearch()" placeholder="Filtrar por cargo, empresa..." class="w-full pl-8 pr-3 py-1.5 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          </div>
+          <select id="scoreFilter" onchange="loadJobs()" class="py-1.5 px-3 border border-slate-200 rounded-lg text-xs font-medium text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            <option value="">Qualquer Score</option>
+            <option value="80">Score &ge; 80%</option>
+            <option value="70">Score &ge; 70%</option>
+            <option value="50">Score &ge; 50%</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Job Cards Feed List -->
+      <div id="jobsList" class="flex flex-col gap-4">
+        <!-- Vagas renderizadas via JS -->
+      </div>
+
+      <!-- Empty State -->
+      <div id="emptyState" class="hidden text-center py-16 bg-white rounded-2xl border border-dashed border-slate-200">
+        <div class="w-16 h-16 rounded-full bg-indigo-50 text-indigo-500 flex items-center justify-center text-2xl mx-auto mb-4">
+          <i class="fa-solid fa-folder-open"></i>
+        </div>
+        <h3 class="text-base font-bold text-slate-800 mb-1">Nenhuma vaga encontrada para esses filtros</h3>
+        <p class="text-xs text-slate-500 max-w-sm mx-auto mb-4">Clique no botão "Buscar Vagas Agora" no topo ou configure mais cargos na aba "Meu Agente".</p>
+        <button onclick="triggerSearch()" class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-xs font-bold shadow hover:bg-indigo-700">
+          <i class="fa-solid fa-wand-magic-sparkles mr-1.5"></i> Buscar Vagas Agora
+        </button>
+      </div>
+    </div>
+
+    <!-- TAB 2: MEU AGENTE / PERFIL -->
+    <div id="tabProfile" class="hidden max-w-4xl mx-auto">
+      <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 sm:p-8">
+        <div class="border-b border-slate-100 pb-5 mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h2 class="text-xl font-bold text-slate-900">Configuração do Agente</h2>
+            <p class="text-xs text-slate-500">Personalize para qualquer profissão: desenvolvedor, designer, marketing, finanças, etc.</p>
+          </div>
+          <button onclick="saveProfile()" class="px-5 py-2.5 rounded-xl text-sm font-bold bg-indigo-600 text-white shadow-md hover:bg-indigo-700 transition flex items-center gap-2">
+            <i class="fa-solid fa-floppy-disk"></i> Salvar Configurações
+          </button>
+        </div>
+
+        <form id="profileForm" onsubmit="event.preventDefault(); saveProfile();" class="space-y-6">
+          
+          <!-- Seção 1: Identificação e Currículo -->
+          <div>
+            <h3 class="text-sm font-bold text-slate-900 mb-3 flex items-center gap-2">
+              <span class="w-6 h-6 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-xs">1</span>
+              Quem é você e seu Currículo
+            </h3>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+              <div>
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Seu Nome Completo</label>
+                <input type="text" id="profName" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500" placeholder="Ex: Maria Silva">
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Seu E-mail (Opcional)</label>
+                <input type="email" id="profEmail" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500" placeholder="maria@exemplo.com">
+              </div>
+            </div>
+
+            <!-- Upload PDF Currículo -->
+            <div class="bg-indigo-50/50 border border-indigo-100 rounded-xl p-4 mb-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center text-lg">
+                  <i class="fa-solid fa-file-pdf"></i>
+                </div>
+                <div>
+                  <h4 class="text-xs font-bold text-slate-900">Importar Currículo em PDF</h4>
+                  <p class="text-xs text-slate-500">Extrai o texto e preenche o perfil automaticamente com IA.</p>
+                </div>
+              </div>
+              <div class="flex items-center gap-2 w-full sm:w-auto">
+                <input type="file" id="resumeFileInput" accept=".pdf,.txt" class="hidden" onchange="handleResumeUpload(event)">
+                <button type="button" onclick="document.getElementById('resumeFileInput').click()" class="w-full sm:w-auto px-4 py-2 bg-white border border-indigo-200 rounded-lg text-xs font-bold text-indigo-700 hover:bg-indigo-50 shadow-sm transition">
+                  <i class="fa-solid fa-upload mr-1"></i> Escolher Arquivo PDF
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <div class="flex items-center justify-between mb-1">
+                <label class="block text-xs font-semibold text-slate-700">Texto do Currículo / Resumo de Experiência</label>
+                <button type="button" onclick="autocompleteProfileAI()" class="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1">
+                  <i class="fa-solid fa-wand-magic-sparkles"></i> ✨ Preencher campos com IA
+                </button>
+              </div>
+              <textarea id="profResumeText" rows="5" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs focus:ring-2 focus:ring-indigo-500" placeholder="Cole aqui seu histórico profissional, ferramentas que domina, projetos, formação..."></textarea>
+            </div>
+          </div>
+
+          <!-- Seção 2: Preferências de Vagas -->
+          <div class="pt-4 border-t border-slate-100">
+            <h3 class="text-sm font-bold text-slate-900 mb-3 flex items-center gap-2">
+              <span class="w-6 h-6 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-xs">2</span>
+              O que você busca
+            </h3>
+            
+            <div class="space-y-4">
+              <div>
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Cargos de Interesse (separados por vírgula)</label>
+                <input type="text" id="profTargetRoles" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500" placeholder="Ex: Product Designer, UX Designer, UX Lead, Desenvolvedor Python">
+                <p class="text-[11px] text-slate-400 mt-1">Essas palavras serão usadas para buscar nas fontes de vagas e boards de empresas.</p>
+              </div>
+
+              <div>
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Palavras-chave a Evitar / Excluir (separadas por vírgula)</label>
+                <input type="text" id="profNegativeKeywords" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500" placeholder="Ex: Graphic Designer, Estágio, Vendas">
+              </div>
+
+              <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <label class="block text-xs font-semibold text-slate-700 mb-1">Modalidade de Trabalho</label>
+                  <div class="flex flex-col gap-1.5 mt-1 text-xs font-medium text-slate-700">
+                    <label class="flex items-center gap-2 cursor-pointer">
+                      <input type="checkbox" id="modeRemote" value="remote" class="rounded text-indigo-600 focus:ring-indigo-500" checked>
+                      <span>Apenas Remoto</span>
+                    </label>
+                    <label class="flex items-center gap-2 cursor-pointer">
+                      <input type="checkbox" id="modeHybrid" value="hybrid" class="rounded text-indigo-600 focus:ring-indigo-500">
+                      <span>Aceita Híbrido</span>
+                    </label>
+                    <label class="flex items-center gap-2 cursor-pointer">
+                      <input type="checkbox" id="modeOnsite" value="onsite" class="rounded text-indigo-600 focus:ring-indigo-500">
+                      <span>Aceita Presencial</span>
+                    </label>
+                  </div>
+                </div>
+
+                <div>
+                  <label class="block text-xs font-semibold text-slate-700 mb-1">Regime de Contrato</label>
+                  <div class="flex flex-col gap-1.5 mt-1 text-xs font-medium text-slate-700">
+                    <label class="flex items-center gap-2 cursor-pointer">
+                      <input type="checkbox" id="typeCLT" value="CLT" class="rounded text-indigo-600 focus:ring-indigo-500" checked>
+                      <span>CLT</span>
+                    </label>
+                    <label class="flex items-center gap-2 cursor-pointer">
+                      <input type="checkbox" id="typePJ" value="PJ" class="rounded text-indigo-600 focus:ring-indigo-500" checked>
+                      <span>PJ</span>
+                    </label>
+                  </div>
+                </div>
+
+                <div>
+                  <label class="block text-xs font-semibold text-slate-700 mb-1">Pretensão Salarial Mínima (R$)</label>
+                  <input type="number" id="profMinSalary" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500" placeholder="0 (sem piso)">
+                  <p class="text-[11px] text-slate-400 mt-1">Se a vaga não publicar salário, ela não será descartada.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Seção 3: Conexão com IA -->
+          <div class="pt-4 border-t border-slate-100">
+            <h3 class="text-sm font-bold text-slate-900 mb-3 flex items-center gap-2">
+              <span class="w-6 h-6 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-xs">3</span>
+              Motor de Inteligência Artificial
+            </h3>
+
+            <div class="bg-slate-50 border border-slate-200 rounded-xl p-4">
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-3">
+                <div>
+                  <label class="block text-xs font-semibold text-slate-700 mb-1">Provedor de IA</label>
+                  <select id="profAIProvider" onchange="updateAIModelOptions()" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-500">
+                    <option value="gemini">Google Gemini (Grátis & Recomendado)</option>
+                    <option value="openai">OpenAI (ChatGPT)</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-xs font-semibold text-slate-700 mb-1">Modelo</label>
+                  <select id="profAIModel" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-500">
+                    <!-- Opções dinâmicas -->
+                  </select>
+                </div>
+              </div>
+
+              <div class="mb-3">
+                <div class="flex items-center justify-between mb-1">
+                  <label class="block text-xs font-semibold text-slate-700">Chave de API (API Key)</label>
+                  <a href="https://aistudio.google.com/app/apikey" target="_blank" id="apiKeyHelpLink" class="text-[11px] text-indigo-600 hover:underline">
+                    Como obter a chave grátis do Gemini &rarr;
+                  </a>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                  <input type="password" id="profAIApiKey" class="flex-1 min-w-[200px] px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500" placeholder="Cole sua chave aqui (ex: AQ.Ab...)">
+                  <button type="button" onclick="testAIConnection()" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 rounded-lg text-xs font-bold text-slate-700 transition">
+                    Testar Conexão
+                  </button>
+                  <button type="button" onclick="diagnoseAIConnection()" class="px-3 py-2 bg-indigo-50 hover:bg-indigo-100 rounded-lg text-xs font-bold text-indigo-700 transition" title="Ver detalhes técnicos da conexão">
+                    <i class="fa-solid fa-stethoscope mr-1"></i> Diagnóstico
+                  </button>
+                </div>
+                <p id="aiTestFeedback" class="text-xs mt-1.5 hidden"></p>
+                <div id="aiDiagnosticBox" class="hidden mt-3 p-3 bg-slate-900 text-slate-200 font-mono text-[11px] rounded-xl overflow-x-auto max-h-60 border border-slate-800">
+                  <!-- Log do diagnóstico -->
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="pt-4 flex justify-end">
+            <button type="submit" class="px-6 py-2.5 rounded-xl text-sm font-bold bg-indigo-600 text-white shadow-md hover:bg-indigo-700 transition">
+              Salvar Perfil
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- TAB 3: EMPRESAS MONITORADAS -->
+    <div id="tabCompanies" class="hidden max-w-4xl mx-auto">
+      <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 sm:p-8">
+        <div class="border-b border-slate-100 pb-5 mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h2 class="text-xl font-bold text-slate-900">Catálogo de Empresas Monitoradas</h2>
+            <p class="text-xs text-slate-500">O robô consulta os quadros oficiais de vagas (Greenhouse e Lever) dessas empresas diretamente.</p>
+          </div>
+          <button onclick="openAddCompanyModal()" class="px-4 py-2 rounded-xl text-xs font-bold bg-indigo-600 text-white shadow-md hover:bg-indigo-700 transition flex items-center gap-1.5">
+            <i class="fa-solid fa-plus"></i> Adicionar Empresa
+          </button>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs">
+            <thead class="bg-slate-50 text-slate-500 uppercase font-semibold border-b border-slate-100">
+              <tr>
+                <th class="py-3 px-4">Nome da Empresa</th>
+                <th class="py-3 px-4">País</th>
+                <th class="py-3 px-4">Board Token (Greenhouse/Lever)</th>
+                <th class="py-3 px-4">Website</th>
+              </tr>
+            </thead>
+            <tbody id="companiesTableBody" class="divide-y divide-slate-100 text-slate-700 font-medium">
+              <!-- Renderizado via JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Modal Adicionar Empresa -->
+  <div id="addCompanyModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center hidden">
+    <div class="bg-white rounded-2xl p-6 max-w-md w-full mx-4 shadow-xl">
+      <div class="flex items-center justify-between mb-4 border-b border-slate-100 pb-3">
+        <h3 class="font-bold text-base text-slate-900">Adicionar Empresa para Monitorar</h3>
+        <button onclick="closeAddCompanyModal()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <form onsubmit="event.preventDefault(); submitAddCompany();" class="space-y-3 text-xs">
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Nome da Empresa</label>
+          <input type="text" id="newCompName" required class="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs" placeholder="Ex: Mercado Livre">
+        </div>
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Greenhouse Board Token (se houver)</label>
+          <input type="text" id="newCompGreenhouse" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs" placeholder="Ex: mercadolivre">
+        </div>
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Lever Site ID (se houver)</label>
+          <input type="text" id="newCompLever" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs" placeholder="Ex: mercadolivre">
+        </div>
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Website</label>
+          <input type="url" id="newCompWebsite" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs" placeholder="https://...">
+        </div>
+        <div class="pt-3 flex justify-end gap-2">
+          <button type="button" onclick="closeAddCompanyModal()" class="px-3 py-2 text-slate-600 font-bold hover:bg-slate-100 rounded-lg">Cancelar</button>
+          <button type="submit" class="px-4 py-2 bg-indigo-600 text-white font-bold rounded-lg shadow hover:bg-indigo-700">Salvar Empresa</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    let currentProfile = null;
+    let currentFilterStatus = 'todas';
+    let searchDebounceTimeout = null;
+
+    // Alternar Abas
+    function switchTab(tab) {
+      document.getElementById('tabFeed').classList.add('hidden');
+      document.getElementById('tabProfile').classList.add('hidden');
+      document.getElementById('tabCompanies').classList.add('hidden');
+
+      const btnFeed = document.getElementById('btnNavFeed');
+      const btnProfile = document.getElementById('btnNavProfile');
+      const btnCompanies = document.getElementById('btnNavCompanies');
+
+      [btnFeed, btnProfile, btnCompanies].forEach(b => {
+        b.className = "px-3.5 py-2 rounded-lg text-sm font-semibold transition text-slate-600 hover:bg-slate-100";
+      });
+
+      if (tab === 'feed') {
+        document.getElementById('tabFeed').classList.remove('hidden');
+        btnFeed.className = "px-3.5 py-2 rounded-lg text-sm font-semibold transition bg-indigo-50 text-indigo-700";
+        loadJobs();
+        loadStats();
+      } else if (tab === 'profile') {
+        document.getElementById('tabProfile').classList.remove('hidden');
+        btnProfile.className = "px-3.5 py-2 rounded-lg text-sm font-semibold transition bg-indigo-50 text-indigo-700";
+        loadProfile();
+      } else if (tab === 'companies') {
+        document.getElementById('tabCompanies').classList.remove('hidden');
+        btnCompanies.className = "px-3.5 py-2 rounded-lg text-sm font-semibold transition bg-indigo-50 text-indigo-700";
+        loadCompanies();
+      }
+    }
+
+    // Autenticação
+    function showAuthModal() {
+      document.getElementById('authModal').classList.remove('hidden');
+    }
+
+    function hideAuthModal() {
+      document.getElementById('authModal').classList.add('hidden');
+    }
+
+    function switchAuthTab(tab) {
+      const loginBtn = document.getElementById('tabAuthLoginBtn');
+      const regBtn = document.getElementById('tabAuthRegisterBtn');
+      const loginForm = document.getElementById('loginForm');
+      const regForm = document.getElementById('registerForm');
+
+      if (tab === 'login') {
+        loginBtn.className = "flex-1 pb-3 text-xs font-bold border-b-2 border-indigo-600 text-indigo-600";
+        regBtn.className = "flex-1 pb-3 text-xs font-bold text-slate-400 border-b-2 border-transparent hover:text-slate-600";
+        loginForm.classList.remove('hidden');
+        regForm.classList.add('hidden');
+      } else {
+        regBtn.className = "flex-1 pb-3 text-xs font-bold border-b-2 border-emerald-600 text-emerald-600";
+        loginBtn.className = "flex-1 pb-3 text-xs font-bold text-slate-400 border-b-2 border-transparent hover:text-slate-600";
+        regForm.classList.remove('hidden');
+        loginForm.classList.add('hidden');
+      }
+    }
+
+    async function handleLogin(e) {
+      e.preventDefault();
+      const username = document.getElementById('loginUsername').value;
+      const password = document.getElementById('loginPassword').value;
+      const btn = document.getElementById('btnLoginSubmit');
+      btn.disabled = true;
+      btn.innerText = 'Entrando...';
+
+      try {
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ username, password })
+        });
+        const data = await res.json();
+        btn.disabled = false;
+        btn.innerText = 'Acessar Plataforma';
+
+        if (res.ok) {
+          hideAuthModal();
+          showToast(`Bem-vindo(a), ${data.name}!`, 'success');
+          loadProfile();
+          loadJobs();
+          loadStats();
+        } else {
+          showToast(data.detail || 'Usuário ou senha incorretos.', 'error');
+        }
+      } catch (err) {
+        btn.disabled = false;
+        btn.innerText = 'Acessar Plataforma';
+        showToast('Erro ao contatar servidor.', 'error');
+      }
+    }
+
+    async function handleRegister(e) {
+      e.preventDefault();
+      const name = document.getElementById('regName').value;
+      const username = document.getElementById('regUsername').value;
+      const password = document.getElementById('regPassword').value;
+      const invite_code = document.getElementById('regInviteCode').value;
+      const btn = document.getElementById('btnRegisterSubmit');
+      btn.disabled = true;
+      btn.innerText = 'Criando conta...';
+
+      try {
+        const res = await fetch('/api/auth/register', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ name, username, password, invite_code })
+        });
+        const data = await res.json();
+        btn.disabled = false;
+        btn.innerText = 'Criar Minha Conta';
+
+        if (res.ok) {
+          hideAuthModal();
+          showToast(`Conta criada com sucesso! Olá, ${data.name}!`, 'success');
+          loadProfile();
+          loadJobs();
+          loadStats();
+        } else {
+          showToast(data.detail || 'Falha ao criar conta.', 'error');
+        }
+      } catch (err) {
+        btn.disabled = false;
+        btn.innerText = 'Criar Minha Conta';
+        showToast('Erro ao contatar servidor.', 'error');
+      }
+    }
+
+    async function handleLogout() {
+      try {
+        await fetch('/api/auth/logout', { method: 'POST' });
+        showToast('Sessão encerrada.', 'info');
+        showAuthModal();
+        document.getElementById('userMenu').classList.add('hidden');
+        document.getElementById('jobsList').innerHTML = '';
+      } catch (err) {}
+    }
+
+    // Carregar Perfil do Backend
+    async function loadProfile() {
+      try {
+        const res = await fetch('/api/profile');
+        if (res.status === 401) {
+          showAuthModal();
+          return;
+        }
+        if (!res.ok) return;
+        const p = await res.json();
+        currentProfile = p;
+        hideAuthModal();
+
+        document.getElementById('profName').value = p.name || '';
+        document.getElementById('profEmail').value = p.email || '';
+        document.getElementById('profResumeText').value = p.resume_text || '';
+        document.getElementById('profTargetRoles').value = (p.target_roles || []).join(', ');
+        document.getElementById('profNegativeKeywords').value = (p.negative_keywords || []).join(', ');
+        document.getElementById('profMinSalary').value = p.min_salary || 0;
+
+        // Checkboxes modalidades
+        const modes = p.work_modes || [];
+        document.getElementById('modeRemote').checked = modes.includes('remote');
+        document.getElementById('modeHybrid').checked = modes.includes('hybrid');
+        document.getElementById('modeOnsite').checked = modes.includes('onsite');
+
+        // Checkboxes regimes
+        const types = p.employment_types || [];
+        document.getElementById('typeCLT').checked = types.includes('CLT');
+        document.getElementById('typePJ').checked = types.includes('PJ');
+
+        // IA
+        document.getElementById('profAIProvider').value = p.ai_provider || 'gemini';
+        updateAIModelOptions();
+        let currentModel = p.ai_model || 'gemini-3.8-flash';
+        if (currentModel === 'gemini-2.5-flash') currentModel = 'gemini-3.8-flash';
+        if (currentModel === 'gemini-2.5-pro') currentModel = 'gemini-3.8-pro';
+        document.getElementById('profAIModel').value = currentModel;
+        document.getElementById('profAIApiKey').value = p.ai_api_key || '';
+
+        if (p.name) {
+          document.getElementById('headerSubtitle').innerText = `Agente de: ${p.name}`;
+          document.getElementById('userMenu').classList.remove('hidden');
+          document.getElementById('userMenu').classList.add('flex');
+          document.getElementById('headerUserName').innerText = p.name;
+        }
+      } catch (err) {
+        console.error("Erro ao carregar perfil:", err);
+      }
+    }
+
+    function updateAIModelOptions() {
+      const provider = document.getElementById('profAIProvider').value;
+      const modelSelect = document.getElementById('profAIModel');
+      const helpLink = document.getElementById('apiKeyHelpLink');
+
+      modelSelect.innerHTML = '';
+      if (provider === 'gemini') {
+        modelSelect.innerHTML = `
+          <option value="gemini-flash-latest">Gemini Flash (Padrão Oficial & Grátis)</option>
+          <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
+          <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash-Lite (Ultra Rápido)</option>
+          <option value="gemini-3-flash-preview">Gemini 3 Flash Preview</option>
+        `;
+        helpLink.innerText = 'Como obter a chave grátis do Gemini →';
+        helpLink.href = 'https://aistudio.google.com/app/apikey';
+      } else {
+        modelSelect.innerHTML = `
+          <option value="gpt-4o-mini">GPT-4o mini (Econômico)</option>
+          <option value="gpt-4o">GPT-4o (Completo)</option>
+        `;
+        helpLink.innerText = 'Como obter a chave da OpenAI →';
+        helpLink.href = 'https://platform.openai.com/api-keys';
+      }
+    }
+
+    async function saveProfile() {
+      const targetRolesStr = document.getElementById('profTargetRoles').value;
+      const negKeywordsStr = document.getElementById('profNegativeKeywords').value;
+
+      const targetRoles = targetRolesStr.split(',').map(s => s.trim()).filter(Boolean);
+      const negKeywords = negKeywordsStr.split(',').map(s => s.trim()).filter(Boolean);
+
+      const workModes = [];
+      if (document.getElementById('modeRemote').checked) workModes.push('remote');
+      if (document.getElementById('modeHybrid').checked) workModes.push('hybrid');
+      if (document.getElementById('modeOnsite').checked) workModes.push('onsite');
+
+      const empTypes = [];
+      if (document.getElementById('typeCLT').checked) empTypes.push('CLT');
+      if (document.getElementById('typePJ').checked) empTypes.push('PJ');
+
+      const payload = {
+        name: document.getElementById('profName').value || 'Meu Perfil',
+        email: document.getElementById('profEmail').value || null,
+        resume_text: document.getElementById('profResumeText').value || '',
+        target_roles: targetRoles,
+        negative_keywords: negKeywords,
+        min_salary: parseFloat(document.getElementById('profMinSalary').value) || 0,
+        employment_types: empTypes,
+        work_modes: workModes,
+        company_country: 'BR',
+        ai_provider: document.getElementById('profAIProvider').value,
+        ai_api_key: document.getElementById('profAIApiKey').value,
+        ai_model: document.getElementById('profAIModel').value
+      };
+
+      try {
+        const res = await fetch('/api/profile', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify(payload)
+        });
+        if (res.ok) {
+          showToast('Configurações salvas com sucesso!', 'success');
+          loadProfile();
+        } else {
+          showToast('Erro ao salvar perfil.', 'error');
+        }
+      } catch (err) {
+        showToast('Falha na comunicação com o servidor local.', 'error');
+      }
+    }
+
+    // Upload de Currículo PDF
+    async function handleResumeUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const formData = new FormData();
+      formData.append('file', file);
+
+      showToast('Lendo arquivo PDF...', 'info');
+      try {
+        const res = await fetch('/api/profile/upload-resume', {
+          method: 'POST',
+          body: formData
+        });
+        if (res.ok) {
+          const data = await res.json();
+          document.getElementById('profResumeText').value = data.text;
+          showToast('Texto do currículo extraído com sucesso!', 'success');
+          // Pergunta se deseja autocompletar com IA
+          if (confirm('Deseja que a IA analise este currículo agora para sugerir cargos e preencher seus dados automaticamente?')) {
+            autocompleteProfileAI();
+          }
+        } else {
+          const err = await res.json();
+          showToast(`Erro ao ler PDF: ${err.detail}`, 'error');
+        }
+      } catch (err) {
+        showToast('Erro ao enviar arquivo.', 'error');
+      }
+    }
+
+    // Autocompletar Perfil com IA
+    async function autocompleteProfileAI() {
+      const resumeText = document.getElementById('profResumeText').value;
+      const apiKey = document.getElementById('profAIApiKey').value;
+      const provider = document.getElementById('profAIProvider').value;
+      const model = document.getElementById('profAIModel').value;
+
+      if (!resumeText) {
+        alert('Cole ou faça upload do seu currículo primeiro!');
+        return;
+      }
+      if (!apiKey) {
+        alert('Informe sua chave de IA no passo 3 para usar o autocompletar!');
+        return;
+      }
+
+      showToast('A IA está analisando seu currículo...', 'info');
+      try {
+        const res = await fetch('/api/profile/autocomplete-with-ai', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            resume_text: resumeText,
+            api_key: apiKey,
+            provider: provider,
+            model: model
+          })
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          if (data.name && !document.getElementById('profName').value) {
+            document.getElementById('profName').value = data.name;
+          }
+          if (data.suggested_roles && data.suggested_roles.length > 0) {
+            document.getElementById('profTargetRoles').value = data.suggested_roles.join(', ');
+          }
+          showToast('Perfil preenchido pela IA com sucesso!', 'success');
+        } else {
+          const err = await res.json();
+          showToast(`Erro na IA: ${err.detail}`, 'error');
+        }
+      } catch (err) {
+        showToast('Erro ao consultar IA.', 'error');
+      }
+    }
+
+    // Testar conexão IA
+    async function testAIConnection() {
+      const provider = document.getElementById('profAIProvider').value;
+      const apiKey = document.getElementById('profAIApiKey').value;
+      const model = document.getElementById('profAIModel').value;
+      const feedback = document.getElementById('aiTestFeedback');
+
+      feedback.classList.remove('hidden', 'text-emerald-600', 'text-rose-600');
+      feedback.classList.add('text-slate-500');
+      feedback.innerText = 'Testando conexão...';
+
+      try {
+        const res = await fetch('/api/ai/test', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ provider, api_key: apiKey, model })
+        });
+        const data = await res.json();
+        feedback.classList.remove('text-slate-500');
+        if (data.success) {
+          feedback.classList.add('text-emerald-600');
+          feedback.innerText = `✓ ${data.message}`;
+        } else {
+          feedback.classList.add('text-rose-600');
+          feedback.innerText = `✗ ${data.message}`;
+        }
+      } catch (err) {
+        feedback.classList.add('text-rose-600');
+        feedback.innerText = 'Erro ao contatar servidor local.';
+      }
+    }
+
+    async function diagnoseAIConnection() {
+      const provider = document.getElementById('profAIProvider').value;
+      const apiKey = document.getElementById('profAIApiKey').value;
+      const model = document.getElementById('profAIModel').value;
+      const box = document.getElementById('aiDiagnosticBox');
+
+      box.classList.remove('hidden');
+      box.innerHTML = '<span class="text-indigo-400">Executando bateria de testes no Google Gemini...</span>';
+
+      try {
+        const res = await fetch('/api/ai/diagnose', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ provider, api_key: apiKey, model })
+        });
+        if (!res.ok) {
+          const errText = await res.text();
+          box.innerHTML = `<span class="text-rose-400">Erro no servidor local (${res.status}): ${escapeHtml(errText)}</span>`;
+          return;
+        }
+        const data = await res.json();
+        
+        let html = '<div class="font-bold text-amber-400 mb-2">=== RELATÓRIO DE DIAGNÓSTICO ===</div>';
+        
+        // 1. ListModels
+        const lm = data.list_models || {};
+        html += `<div class="mb-2"><strong>1. Validação da Chave (ListModels):</strong><br>`;
+        html += `Status: ${lm.status} | Sucesso: ${lm.success ? 'SIM ✓' : 'NÃO ✗'}<br>`;
+        if (lm.available_flash_models) {
+          html += `<span class="text-emerald-400">Modelos liberados na sua conta: ${lm.available_flash_models.join(', ')}</span><br>`;
+        }
+        if (!lm.success) {
+          html += `<span class="text-rose-400">${escapeHtml(lm.message)}</span><br>`;
+        }
+        html += '</div>';
+
+        // 2. Interactions API
+        const inter = data.interactions || {};
+        html += `<div class="mb-2"><strong>2. Interactions API (gemini-3.8-flash):</strong><br>`;
+        html += `Status: ${inter.status} | Sucesso: ${inter.success ? 'SIM ✓' : 'NÃO ✗'}<br>`;
+        html += `<span class="${inter.success ? 'text-emerald-400' : 'text-rose-400'}">${escapeHtml(inter.message)}</span></div>`;
+
+        // 3. generateContent clássico
+        const gen = data.generate_content || [];
+        html += `<div><strong>3. Endpoints Clássicos (generateContent):</strong><br>`;
+        gen.forEach(g => {
+          html += `- ${g.model}: Status ${g.status} (${g.success ? 'OK ✓' : 'Falha ✗'})<br>`;
+        });
+        html += '</div>';
+
+        box.innerHTML = html;
+      } catch (err) {
+        box.innerHTML = `<span class="text-rose-400">Falha ao rodar diagnóstico: ${err.message}</span>`;
+      }
+    }
+
+    // Executar Busca de Vagas
+    async function triggerSearch() {
+      const modal = document.getElementById('searchModal');
+      modal.classList.remove('hidden');
+
+      try {
+        const res = await fetch('/api/search/run', { method: 'POST' });
+        modal.classList.add('hidden');
+        if (res.ok) {
+          const data = await res.json();
+          showToast(`Busca concluída! ${data.jobs_found} vagas encontradas (${data.jobs_new} novas, ${data.evaluated_count} avaliadas com IA).`, 'success');
+          loadJobs();
+          loadStats();
+        } else {
+          const err = await res.json();
+          showToast(`Erro ao buscar: ${err.detail}`, 'error');
+        }
+      } catch (err) {
+        modal.classList.add('hidden');
+        showToast('Falha na requisição de busca.', 'error');
+      }
+    }
+
+    // Carregar Estatísticas
+    async function loadStats() {
+      try {
+        const res = await fetch('/api/stats');
+        if (!res.ok) return;
+        const s = await res.json();
+        document.getElementById('statTotalJobs').innerText = s.total_jobs;
+        document.getElementById('statHighMatch').innerText = s.high_match;
+        document.getElementById('statFavorites').innerText = s.favorites;
+        document.getElementById('statApplied').innerText = s.applied;
+      } catch (err) {}
+    }
+
+    // Filtrar e Listar Vagas
+    function setFilterStatus(status) {
+      currentFilterStatus = status;
+      document.querySelectorAll('.filter-btn').forEach(btn => {
+        if (btn.getAttribute('data-status') === status) {
+          btn.className = "filter-btn px-3 py-1.5 rounded-lg text-xs font-bold transition bg-slate-900 text-white";
+        } else {
+          btn.className = "filter-btn px-3 py-1.5 rounded-lg text-xs font-bold transition bg-slate-100 text-slate-600 hover:bg-slate-200";
+        }
+      });
+      loadJobs();
+    }
+
+    function debounceSearch() {
+      clearTimeout(searchDebounceTimeout);
+      searchDebounceTimeout = setTimeout(loadJobs, 300);
+    }
+
+    async function loadJobs() {
+      const search = document.getElementById('searchInput').value;
+      const minScore = document.getElementById('scoreFilter').value;
+
+      let url = `/api/jobs?status=${currentFilterStatus}`;
+      if (search) url += `&search=${encodeURIComponent(search)}`;
+      if (minScore) url += `&min_score=${minScore}`;
+
+      try {
+        const res = await fetch(url);
+        if (!res.ok) return;
+        const jobs = await res.json();
+        renderJobs(jobs);
+      } catch (err) {
+        console.error("Erro ao listar vagas:", err);
+      }
+    }
+
+    function renderSingleJobCard(j) {
+      const isPendingAI = !j.score || (j.reasoning && (j.reasoning.includes('Aguardando') || j.reasoning.includes('Clique para analisar')));
+      const scoreColor = j.score >= 80 ? 'text-emerald-600 bg-emerald-50 border-emerald-200' :
+                         j.score >= 65 ? 'text-indigo-600 bg-indigo-50 border-indigo-200' :
+                         'text-amber-600 bg-amber-50 border-amber-200';
+
+      const scoreBadge = isPendingAI
+        ? `<div class="px-3 py-1.5 rounded-xl border font-bold text-xs bg-slate-100 text-slate-600 border-slate-200 flex items-center gap-1.5"><i class="fa-solid fa-clock text-xs text-slate-400"></i><span>Aguardando IA</span></div>`
+        : `<div class="px-3.5 py-1.5 rounded-xl border font-extrabold text-sm flex items-center gap-1.5 ${scoreColor}"><i class="fa-solid fa-chart-pie text-xs"></i><span>${j.score}% Match</span></div>`;
+
+      const isFavorite = j.user_status === 'favorita';
+      const isApplied = j.user_status === 'candidatado';
+
+      return `
+        <div id="job-card-${j.evaluation_id}" class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 hover:shadow-md transition">
+          <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-3">
+            <div class="flex-1">
+              <div class="flex flex-wrap items-center gap-2 mb-1.5">
+                <span class="text-xs font-bold uppercase tracking-wider text-slate-400">${j.source}</span>
+                ${j.remote_type === 'remote' ? '<span class="px-2 py-0.5 rounded-md text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-100"><i class="fa-solid fa-house-laptop mr-1"></i>Remoto</span>' : ''}
+                ${j.seniority && j.seniority !== 'N/A' && j.seniority !== 'Aguardando' ? `<span class="px-2 py-0.5 rounded-md text-[11px] font-bold bg-slate-100 text-slate-700">${j.seniority}</span>` : ''}
+                ${j.salary_min || j.salary_max ? `<span class="px-2 py-0.5 rounded-md text-[11px] font-bold bg-amber-50 text-amber-700"><i class="fa-solid fa-money-bill-wave mr-1"></i>${j.salary_currency || 'R$'} ${j.salary_min || 0} - ${j.salary_max || 0}</span>` : ''}
+              </div>
+              <h3 class="text-lg font-bold text-slate-900 leading-snug">${escapeHtml(j.title)}</h3>
+              <p class="text-xs font-semibold text-slate-600 mt-0.5">
+                <i class="fa-solid fa-building mr-1 text-slate-400"></i> ${escapeHtml(j.company_name)}
+                ${j.location ? `<span class="mx-1.5 text-slate-300">•</span><i class="fa-solid fa-location-dot mr-1 text-slate-400"></i> ${escapeHtml(j.location)}` : ''}
+              </p>
+            </div>
+
+            <!-- Score Badge -->
+            <div class="flex sm:flex-col items-center sm:items-end justify-between border-t sm:border-t-0 pt-3 sm:pt-0 border-slate-100">
+              ${scoreBadge}
+              <span class="text-[11px] text-slate-400 font-medium mt-1">${formatTimeAgo(j.evaluated_at)}</span>
+            </div>
+          </div>
+
+          <!-- Parecer da IA -->
+          <div class="bg-slate-50 rounded-xl p-3.5 mb-4 border border-slate-100">
+            <p class="text-xs text-slate-700 mb-2 font-medium leading-relaxed">
+              <strong class="text-indigo-600">Parecer da IA:</strong> ${escapeHtml(j.reasoning || 'Sem justificativa')}
+            </p>
+            
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+              ${(j.positives || []).length > 0 ? `
+                <div class="bg-emerald-50/70 p-2.5 rounded-lg border border-emerald-100">
+                  <p class="font-bold text-emerald-800 text-[11px] mb-1"><i class="fa-solid fa-thumbs-up mr-1"></i> Pontos Fortes:</p>
+                  <ul class="list-disc list-inside text-emerald-700 text-[11px] space-y-0.5">
+                    ${j.positives.map(p => `<li>${escapeHtml(p)}</li>`).join('')}
+                  </ul>
+                </div>
+              ` : ''}
+              ${(j.concerns || []).length > 0 ? `
+                <div class="bg-amber-50/70 p-2.5 rounded-lg border border-amber-100">
+                  <p class="font-bold text-amber-800 text-[11px] mb-1"><i class="fa-solid fa-triangle-exclamation mr-1"></i> Pontos de Atenção:</p>
+                  <ul class="list-disc list-inside text-amber-700 text-[11px] space-y-0.5">
+                    ${j.concerns.map(c => `<li>${escapeHtml(c)}</li>`).join('')}
+                  </ul>
+                </div>
+              ` : ''}
+            </div>
+          </div>
+
+          <!-- Footer Actions -->
+          <div class="flex flex-wrap items-center justify-between gap-3 pt-2">
+            <div class="flex items-center gap-1.5">
+              ${isPendingAI ? `
+                <button onclick="evaluateJobNow(${j.evaluation_id}, this)" class="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-xs font-bold transition flex items-center gap-1.5 border border-indigo-200">
+                  <i class="fa-solid fa-wand-magic-sparkles text-indigo-500"></i> Avaliar com IA Agora
+                </button>
+              ` : ''}
+              <button onclick="updateJobStatus(${j.evaluation_id}, '${isFavorite ? 'nova' : 'favorita'}')" class="px-3 py-1.5 rounded-lg text-xs font-bold transition ${isFavorite ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}">
+                <i class="fa-${isFavorite ? 'solid' : 'regular'} fa-star mr-1"></i> ${isFavorite ? 'Favoritada' : 'Favoritar'}
+              </button>
+              <button onclick="updateJobStatus(${j.evaluation_id}, '${isApplied ? 'nova' : 'candidatado'}')" class="px-3 py-1.5 rounded-lg text-xs font-bold transition ${isApplied ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}">
+                <i class="fa-solid fa-paper-plane mr-1"></i> ${isApplied ? 'Candidatado' : 'Já me Canditatei'}
+              </button>
+              <button onclick="updateJobStatus(${j.evaluation_id}, 'descartada')" class="px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition" title="Descartar vaga">
+                <i class="fa-solid fa-trash-can"></i>
+              </button>
+            </div>
+
+            <a href="${j.application_url}" target="_blank" class="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold shadow-sm transition flex items-center gap-1.5">
+              <span>Ver Vaga e Candidatar</span>
+              <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
+            </a>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderJobs(jobs) {
+      const container = document.getElementById('jobsList');
+      const empty = document.getElementById('emptyState');
+
+      if (!jobs || jobs.length === 0) {
+        container.innerHTML = '';
+        empty.classList.remove('hidden');
+        return;
+      }
+
+      empty.classList.add('hidden');
+      container.innerHTML = jobs.map(renderSingleJobCard).join('');
+    }
+
+    async function updateJobStatus(evaluationId, newStatus) {
+      try {
+        const res = await fetch(`/api/jobs/${evaluationId}/status`, {
+          method: 'PATCH',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ status: newStatus })
+        });
+        if (res.ok) {
+          loadJobs();
+          loadStats();
+        }
+      } catch (err) {}
+    }
+
+    async function evaluateJobNow(evaluationId, btn) {
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Analisando...';
+      }
+      try {
+        const res = await fetch(`/api/jobs/${evaluationId}/evaluate`, { method: 'POST' });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.job) {
+            const cardEl = document.getElementById(`job-card-${evaluationId}`);
+            if (cardEl) {
+              cardEl.outerHTML = renderSingleJobCard(data.job);
+              const newCard = document.getElementById(`job-card-${evaluationId}`);
+              if (newCard) {
+                newCard.classList.add('ring-2', 'ring-emerald-500');
+                setTimeout(() => newCard.classList.remove('ring-2', 'ring-emerald-500'), 3000);
+              }
+            }
+            showToast(`Vaga avaliada com sucesso! Match: ${data.job.score}%`, 'success');
+          } else {
+            showToast('Vaga avaliada com sucesso!', 'success');
+          }
+          loadStats();
+        } else {
+          const err = await res.json();
+          showToast(`Erro na avaliação: ${err.detail}`, 'error');
+          if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles text-indigo-500 mr-1"></i> Avaliar com IA Agora';
+          }
+        }
+      } catch (err) {
+        showToast('Erro ao contatar servidor local.', 'error');
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles text-indigo-500 mr-1"></i> Avaliar com IA Agora';
+        }
+      }
+    }
+
+    // Empresas
+    async function loadCompanies() {
+      try {
+        const res = await fetch('/api/companies');
+        if (!res.ok) return;
+        const comps = await res.json();
+        const tbody = document.getElementById('companiesTableBody');
+        tbody.innerHTML = comps.map(c => `
+          <tr class="hover:bg-slate-50">
+            <td class="py-3 px-4 font-bold text-slate-900">${escapeHtml(c.name)}</td>
+            <td class="py-3 px-4">${escapeHtml(c.country_code || 'BR')}</td>
+            <td class="py-3 px-4 font-mono text-[11px] text-slate-500">
+              ${c.greenhouse_board_token ? `<span class="bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded">Greenhouse: ${escapeHtml(c.greenhouse_board_token)}</span> ` : ''}
+              ${c.lever_site ? `<span class="bg-blue-50 text-blue-700 px-2 py-0.5 rounded">Lever: ${escapeHtml(c.lever_site)}</span>` : ''}
+            </td>
+            <td class="py-3 px-4">
+              ${c.website ? `<a href="${c.website}" target="_blank" class="text-indigo-600 hover:underline">Acessar site ↗</a>` : '-'}
+            </td>
+          </tr>
+        `).join('');
+      } catch (err) {}
+    }
+
+    function openAddCompanyModal() { document.getElementById('addCompanyModal').classList.remove('hidden'); }
+    function closeAddCompanyModal() { document.getElementById('addCompanyModal').classList.add('hidden'); }
+
+    async function submitAddCompany() {
+      const payload = {
+        name: document.getElementById('newCompName').value,
+        greenhouse_board_token: document.getElementById('newCompGreenhouse').value || null,
+        lever_site: document.getElementById('newCompLever').value || null,
+        website: document.getElementById('newCompWebsite').value || null,
+        country_code: 'BR'
+      };
+      try {
+        const res = await fetch('/api/companies', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify(payload)
+        });
+        if (res.ok) {
+          closeAddCompanyModal();
+          showToast('Empresa adicionada!', 'success');
+          loadCompanies();
+        }
+      } catch (err) {}
+    }
+
+    // Toast UI
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toastContainer');
+      const toast = document.createElement('div');
+      const colors = {
+        success: 'bg-emerald-600 text-white',
+        error: 'bg-rose-600 text-white',
+        info: 'bg-slate-900 text-white'
+      };
+      toast.className = `pointer-events-auto px-4 py-2.5 rounded-xl shadow-lg text-xs font-bold transition transform duration-200 ease-out flex items-center gap-2 ${colors[type] || colors.info}`;
+      toast.innerHTML = `<span>${escapeHtml(message)}</span>`;
+      container.appendChild(toast);
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        setTimeout(() => toast.remove(), 300);
+      }, 4000);
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function formatTimeAgo(dateStr) {
+      if (!dateStr) return '';
+      return 'Avaliada recentemente';
+    }
+
+    // Inicialização
+    window.addEventListener('DOMContentLoaded', () => {
+      loadProfile();
+      loadJobs();
+      loadStats();
+    });
+  </script>
+</body>
+</html>
