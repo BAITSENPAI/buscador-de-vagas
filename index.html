@@ -605,8 +605,9 @@
       modelSelect.innerHTML = '';
       if (provider === 'gemini') {
         modelSelect.innerHTML = `
-          <option value="gemini-3-flash-preview">Gemini 3 Flash Preview (Recomendado & Grátis)</option>
-          <option value="gemini-3.1-flash-lite-preview">Gemini 3.1 Flash-Lite (Ultra Rápido)</option>
+          <option value="gemini-3-flash-preview">Gemini 3 Flash Preview (Recomendado & Rápido)</option>
+          <option value="gemini-3.8-flash">Gemini 3.8 Flash (Mais Recente)</option>
+          <option value="gemini-3.1-flash-lite-preview">Gemini 3.1 Flash-Lite (Ultra Leve)</option>
           <option value="gemini-flash-latest">Gemini Flash Latest</option>
         `;
       } else {
@@ -659,7 +660,7 @@
       if (!cleanedKey) throw new Error('Chave de API não informada.');
 
       if (provider === 'gemini') {
-        const candidateModels = [model, 'gemini-3-flash-preview', 'gemini-3.1-flash-lite-preview', 'gemini-flash-latest'];
+        const candidateModels = [model, 'gemini-3-flash-preview', 'gemini-3.8-flash', 'gemini-3.1-flash-lite-preview', 'gemini-flash-latest'];
         const uniqueModels = [...new Set(candidateModels)];
 
         for (const m of uniqueModels) {
@@ -934,6 +935,128 @@ Responda EXCLUSIVAMENTE em formato JSON:
       return collected;
     }
 
+    // AGENTE AUTÔNOMO DE PESQUISA ATIVA NA WEB VIA GOOGLE SEARCH
+    async function searchJobsWithWebGrounding(profile, apiKey) {
+      const cleanedKey = apiKey.trim().replace(/^["']|["']$/g, '');
+      if (!cleanedKey) return [];
+
+      const targetRoles = (profile.target_roles || []).join(', ') || 'Vagas de Emprego';
+      const modes = (profile.work_modes || ['remote']).join(', ');
+
+      const prompt = `Você é um agente autônomo recrutador e headhunter no Brasil com acesso de busca à web.
+Pesquise ativamente no Google por 5 a 10 vagas de emprego REAIS, ATIVAS e ABERTAS RECENTEMENTE no Brasil compatíveis com o seguinte perfil:
+
+CARGOS DESEJADOS: ${targetRoles}
+MODALIDADES: ${modes}
+
+Procure por vagas reais publicadas em murais de emprego brasileiros como Gupy (gupy.io), LinkedIn (linkedin.com/jobs), Catho, Glassdoor, InfoJobs, Indeed ou portais oficiais de carreiras das empresas.
+
+Para CADA vaga real que você encontrar na pesquisa web, extraia com precisão:
+- "title": título exato do cargo
+- "company_name": nome da empresa que abriu a vaga
+- "location": cidade/estado ou "Remoto (Brasil)"
+- "remote_type": "remote" se for remoto, "hybrid" se for híbrido, ou "onsite" se for presencial
+- "application_url": link direto e oficial para candidatura ou página da vaga
+- "description": resumo dos principais requisitos, atividades e competências exigidas
+- "published_at": estimativa da data recente da vaga
+
+Responda EXCLUSIVAMENTE em um bloco de código JSON como este exemplo:
+\`\`\`json
+[
+  {
+    "title": "Analista de RH Pleno",
+    "company_name": "Empresa XYZ",
+    "location": "Remoto (Brasil)",
+    "remote_type": "remote",
+    "application_url": "https://empresa.gupy.io/job/123",
+    "description": "Responsável por recrutamento e seleção, onboarding e clima organizacional...",
+    "published_at": "2026-11-01"
+  }
+]
+\`\`\``;
+
+      const candidateModels = [
+        profile.ai_model,
+        'gemini-3.8-flash',
+        'gemini-3-flash-preview',
+        'gemini-3.1-flash-lite-preview',
+        'gemini-flash-latest'
+      ].filter(Boolean);
+      const uniqueModels = [...new Set(candidateModels)];
+
+      for (const m of uniqueModels) {
+        try {
+          const url = `https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent`;
+          const res = await fetch(url, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-goog-api-key': cleanedKey
+            },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              tools: [{ googleSearch: {} }]
+            })
+          });
+
+          if (res.ok) {
+            const data = await res.json();
+            const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+            const chunks = data.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
+
+            let jobsList = [];
+            const jsonBlock = text.match(/```json([\s\S]*?)```/) || text.match(/\[([\s\S]*)\]/);
+            if (jsonBlock) {
+              const rawJson = jsonBlock[1] ? (jsonBlock[1].trim().startsWith('[') ? jsonBlock[1].trim() : '[' + jsonBlock[1].trim() + ']') : jsonBlock[0].trim();
+              try {
+                jobsList = JSON.parse(rawJson);
+              } catch (e) {
+                const arrMatch = text.match(/\[\s*\{[\s\S]*\}\s*\]/);
+                if (arrMatch) {
+                  try { jobsList = JSON.parse(arrMatch[0]); } catch (e2) {}
+                }
+              }
+            }
+
+            if (Array.isArray(jobsList) && jobsList.length > 0) {
+              const formattedJobs = [];
+              for (const j of jobsList) {
+                if (!j.title || !j.company_name) continue;
+
+                let appUrl = j.application_url;
+                if (!appUrl || !appUrl.startsWith('http')) {
+                  const matchChunk = chunks.find(c => (c.web?.title || '').toLowerCase().includes(j.company_name.toLowerCase()) || (c.web?.title || '').toLowerCase().includes(j.title.toLowerCase()));
+                  appUrl = matchChunk?.web?.uri || `https://www.google.com/search?q=${encodeURIComponent(j.company_name + ' vaga ' + j.title)}`;
+                }
+
+                const hash = await generateHash(`google_search|${j.company_name}|${j.title}|${(j.description || '').slice(0, 500)}`);
+                formattedJobs.push({
+                  source: 'google_search',
+                  external_id: hash.slice(0, 16),
+                  company_name: j.company_name,
+                  title: j.title,
+                  location: j.location || 'Brasil',
+                  remote_type: j.remote_type || 'remote',
+                  description: j.description || j.title,
+                  application_url: appUrl,
+                  salary_min: j.salary_min || null,
+                  salary_max: j.salary_max || null,
+                  content_hash: hash,
+                  published_at: j.published_at || new Date().toISOString()
+                });
+              }
+              if (formattedJobs.length > 0) {
+                return formattedJobs;
+              }
+            }
+          }
+        } catch (err) {
+          console.warn(`Erro no modelo ${m} com googleSearch:`, err);
+        }
+      }
+      return [];
+    }
+
     // AVALIAÇÃO MINUCIOSA DE UMA VAGA COM IA CONFRONTANDO COM O CURRÍCULO
     async function evaluateJobWithAI(job, profile) {
       if (!profile.ai_api_key) {
@@ -1019,34 +1142,48 @@ Responda EXCLUSIVAMENTE em formato JSON:
       const modal = document.getElementById('searchModal');
       const progressText = document.getElementById('searchProgressText');
       modal.classList.remove('hidden');
-      progressText.innerText = `Consultando murais de vagas compatíveis com ${(profile.target_roles || []).join(', ')}...`;
 
       const companies = getStoredCompanies();
       const existingJobs = getStoredJobs();
       const existingEvals = getStoredEvaluations();
 
+      const newlyAdded = [];
+      const jobMap = new Map();
+      existingJobs.forEach(j => jobMap.set(j.content_hash, j));
+
       try {
-        const newlyFetched = await fetchAllJobs(profile, companies);
-
-        let newCount = 0;
-        const jobMap = new Map();
-        existingJobs.forEach(j => jobMap.set(j.content_hash, j));
-
-        const newlyAdded = [];
-        for (const j of newlyFetched) {
-          if (!jobMap.has(j.content_hash)) {
-            jobMap.set(j.content_hash, j);
-            newlyAdded.push(j);
-            newCount++;
+        // 1. PESQUISA WEB ATIVA AO VIVO VIA AGENTE GOOGLE SEARCH
+        if (profile.ai_api_key && profile.ai_provider === 'gemini') {
+          progressText.innerText = `Agente pesquisando ativamente no Google por vagas de: ${(profile.target_roles || []).join(', ')}...`;
+          try {
+            const webJobs = await searchJobsWithWebGrounding(profile, profile.ai_api_key);
+            for (const j of webJobs) {
+              if (!jobMap.has(j.content_hash)) {
+                jobMap.set(j.content_hash, j);
+                newlyAdded.push(j);
+              }
+            }
+          } catch (webErr) {
+            console.warn('Busca web retornou aviso:', webErr);
           }
         }
 
-        // Se tem currículo e chave de IA, avalia automaticamente as top vagas capturadas com o currículo!
+        // 2. CONSULTA TAMBÉM MURAIS OFICIAIS DAS EMPRESAS CADASTRADAS (Greenhouse / Lever)
+        progressText.innerText = `Consultando murais e empresas parceiras...`;
+        const companyJobs = await fetchAllJobs(profile, companies);
+        for (const j of companyJobs) {
+          if (!jobMap.has(j.content_hash)) {
+            jobMap.set(j.content_hash, j);
+            newlyAdded.push(j);
+          }
+        }
+
+        // 3. AVALIAÇÃO DE COMPATIBILIDADE DAS NOVAS VAGAS COM O CURRÍCULO VIA IA
         if (profile.ai_api_key && profile.resume_text && newlyAdded.length > 0) {
-          const toEvaluate = newlyAdded.slice(0, 8); // avalia até 8 vagas por busca na hora
+          const toEvaluate = newlyAdded.slice(0, 10);
           for (let i = 0; i < toEvaluate.length; i++) {
             const j = toEvaluate[i];
-            progressText.innerText = `Avaliando afinidade com seu currículo via IA (${i + 1} de ${toEvaluate.length})...`;
+            progressText.innerText = `Avaliando afinidade com o seu currículo via IA (${i + 1} de ${toEvaluate.length})...`;
             try {
               const ev = await evaluateJobWithAI(j, profile);
               ev.status = 'nova';
@@ -1056,7 +1193,7 @@ Responda EXCLUSIVAMENTE em formato JSON:
                 score: 50,
                 status: 'nova',
                 seniority: 'Aguardando',
-                reasoning: 'Não foi possível avaliar via IA: ' + evalErr.message
+                reasoning: 'Vaga encontrada na web. Clique em "Avaliar com IA" para gerar o parecer completo.'
               };
             }
           }
@@ -1069,9 +1206,9 @@ Responda EXCLUSIVAMENTE em formato JSON:
               score: 50,
               seniority: 'Aguardando',
               qualified: true,
-              positives: ['Vaga capturada por cargo compatível'],
+              positives: ['Vaga capturada pelo agente'],
               concerns: ['Clique para analisar com IA'],
-              reasoning: 'Vaga identificada pelo título. Clique em "Avaliar com IA" para gerar o parecer completo.',
+              reasoning: 'Vaga identificada pelo agente. Clique em "Avaliar com IA" para gerar o parecer completo.',
               status: 'nova',
               evaluated_at: new Date().toISOString()
             };
@@ -1083,7 +1220,7 @@ Responda EXCLUSIVAMENTE em formato JSON:
         saveStoredEvaluations(existingEvals);
 
         modal.classList.add('hidden');
-        showToast(`Busca concluída! ${mergedJobs.length} vagas no catálogo (${newCount} novas capturadas).`, 'success');
+        showToast(`Busca concluída! ${mergedJobs.length} vagas no catálogo (${newlyAdded.length} novas capturadas na Web e Murais).`, 'success');
         loadJobs();
         loadStats();
       } catch (err) {
@@ -1225,7 +1362,9 @@ Responda EXCLUSIVAMENTE em formato JSON:
           <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-3">
             <div class="flex-1">
               <div class="flex flex-wrap items-center gap-2 mb-1.5">
-                <span class="text-xs font-bold uppercase tracking-wider text-slate-400">${j.source}</span>
+                ${j.source === 'google_search' 
+                  ? '<span class="px-2 py-0.5 rounded-md text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200 flex items-center gap-1"><i class="fa-brands fa-google text-blue-500"></i>Web / Google Search</span>'
+                  : `<span class="text-xs font-bold uppercase tracking-wider text-slate-400">${j.source}</span>`}
                 ${j.remote_type === 'remote' ? '<span class="px-2 py-0.5 rounded-md text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-100"><i class="fa-solid fa-house-laptop mr-1"></i>Remoto</span>' : ''}
                 ${e.seniority && e.seniority !== 'N/A' && e.seniority !== 'Aguardando' ? `<span class="px-2 py-0.5 rounded-md text-[11px] font-bold bg-slate-100 text-slate-700">${e.seniority}</span>` : ''}
                 ${j.salary_min || j.salary_max ? `<span class="px-2 py-0.5 rounded-md text-[11px] font-bold bg-amber-50 text-amber-700"><i class="fa-solid fa-money-bill-wave mr-1"></i>R$ ${j.salary_min || 0} - ${j.salary_max || 0}</span>` : ''}
